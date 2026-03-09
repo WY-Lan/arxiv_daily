@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+*.log
+logs/
+storage/*.db
+storage/*.pdf
+.idea/
+.vscode/
+*.md
+!README.md

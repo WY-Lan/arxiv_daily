@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>论文审核系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            opacity: 0.9;
+        }
+
+        .expire-notice {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .paper-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .paper-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .paper-number {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .paper-title {
+            font-size: 1.2rem;
+            color: #333;
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+
+        .paper-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .paper-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .paper-body {
+            padding: 20px;
+        }
+
+        .paper-abstract {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .paper-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .tag {
+            background: #f0f0f0;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .paper-scores {
+            display: flex;
+            gap: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .paper-actions {
+            padding: 15px 20px;
+            background: #f9f9f9;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-approve {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #059669;
+        }
+
+        .btn-reject {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: #dc2626;
+        }
+
+        .btn-edit {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #4f46e5;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn.approved {
+            background: #059669;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn.rejected {
+            background: #dc2626;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+        }
+
+        .feedback-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .feedback-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .edit-area {
+            display: none;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .edit-area.active {
+            display: block;
+        }
+
+        .edit-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .edit-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .submit-section {
+            text-align: center;
+            margin-top: 30px;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .submit-btn {
+            padding: 15px 50px;
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .paper-link {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .paper-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .paper-scores {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .paper-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 论文审核</h1>
+            <div class="subtitle">请审核以下 {{ papers|length }} 篇论文</div>
+            <div class="expire-notice">⏰ 链接有效期至: {{ expire_time }}</div>
+        </div>
+
+        <form id="reviewForm">
+            {% for paper in papers %}
+            <div class="paper-card" data-arxiv-id="{{ paper.arxiv_id }}">
+                <div class="paper-header">
+                    <span class="paper-number">论文 {{ loop.index }}</span>
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/{{ paper.arxiv_id }}" target="_blank" class="paper-link">
+                            {{ paper.title }}
+                        </a>
+                    </h2>
+                    <div class="paper-meta">
+                        <span>👥 {{ (paper.authors|join(', '))[:50] }}{% if paper.authors and paper.authors|length > 3 %}...{% endif %}</span>
+                        <span>📅 {{ paper.published_date[:10] if paper.published_date else '' }}</span>
+                    </div>
+                </div>
+
+                <div class="paper-body">
+                    <div class="paper-scores">
+                        <div class="score-item">
+                            <div class="score-value">{{ "%.1f"|format(paper.total_score or 0) }}</div>
+                            <div class="score-label">总评分</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-value">{{ paper.citation_count or 0 }}</div>
+                            <div class="score-label">引用数</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-value">{{ "%.1f"|format(paper.influence_score or 0) }}</div>
+                            <div class="score-label">影响力</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-value">{{ "%.1f"|format(paper.quality_score or 0) }}</div>
+                            <div class="score-label">质量分</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-abstract">
+                        {{ paper.abstract or paper.summary or '暂无摘要' }}
+                    </div>
+
+                    {% if paper.categories or paper.tags %}
+                    <div class="paper-tags">
+                        {% for cat in (paper.categories or paper.tags or [])[:5] %}
+                        <span class="tag">{{ cat }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="paper-actions">
+                    <button type="button" class="btn btn-approve" onclick="setAction('{{ paper.arxiv_id }}', 'approve', this)">
+                        ✅ 通过
+                    </button>
+                    <button type="button" class="btn btn-reject" onclick="setAction('{{ paper.arxiv_id }}', 'reject', this)">
+                        ❌ 驳回
+                    </button>
+                    <button type="button" class="btn btn-edit" onclick="toggleEdit('{{ paper.arxiv_id }}', this)">
+                        ✏️ 编辑摘要
+                    </button>
+                    <input type="text" class="feedback-input" placeholder="审核意见（可选）" id="feedback-{{ paper.arxiv_id }}">
+
+                    <input type="hidden" name="action-{{ paper.arxiv_id }}" id="action-{{ paper.arxiv_id }}" value="approve">
+                </div>
+
+                <div class="edit-area" id="edit-{{ paper.arxiv_id }}">
+                    <textarea class="edit-textarea" placeholder="编辑论文摘要..." id="edited-summary-{{ paper.arxiv_id }}">{{ paper.summary or paper.abstract or '' }}</textarea>
+                    <div style="margin-top: 10px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="toggleEdit('{{ paper.arxiv_id }}', null)">取消</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="submit-section">
+                <p style="margin-bottom: 20px; color: #666;">
+                    已选择: <span id="approvedCount">0</span> 篇通过，<span id="rejectedCount">0</span> 篇驳回
+                </p>
+                <button type="submit" class="btn btn-approve submit-btn">
+                    📤 提交审核结果
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const reviewResults = {};
+
+        // Initialize all papers as approved by default
+        {% for paper in papers %}
+        reviewResults['{{ paper.arxiv_id }}'] = {
+            action: 'approve',
+            feedback: '',
+            edited_summary: null
+        };
+        {% endfor %}
+
+        function setAction(arxivId, action, btn) {
+            reviewResults[arxivId].action = action;
+
+            // Update hidden input
+            document.getElementById(`action-${arxivId}`).value = action;
+
+            // Update button states
+            const card = btn.closest('.paper-card');
+            const approveBtn = card.querySelector('.btn-approve');
+            const rejectBtn = card.querySelector('.btn-reject');
+
+            approveBtn.classList.remove('approved');
+            rejectBtn.classList.remove('rejected');
+
+            if (action === 'approve') {
+                approveBtn.classList.add('approved');
+            } else {
+                rejectBtn.classList.add('rejected');
+            }
+
+            updateCounts();
+        }
+
+        function toggleEdit(arxivId, btn) {
+            const editArea = document.getElementById(`edit-${arxivId}`);
+            editArea.classList.toggle('active');
+        }
+
+        function updateCounts() {
+            let approved = 0;
+            let rejected = 0;
+
+            Object.values(reviewResults).forEach(r => {
+                if (r.action === 'approve') approved++;
+                else if (r.action === 'reject') rejected++;
+            });
+
+            document.getElementById('approvedCount').textContent = approved;
+            document.getElementById('rejectedCount').textContent = rejected;
+        }
+
+        // Initialize counts
+        updateCounts();
+
+        // Form submission
+        document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Collect all results
+            const results = [];
+
+            {% for paper in papers %}
+            const arxivId = '{{ paper.arxiv_id }}';
+            const feedback = document.getElementById(`feedback-${arxivId}`).value;
+            const editArea = document.getElementById(`edit-${arxivId}`);
+            const editedSummary = editArea.classList.contains('active')
+                ? document.getElementById(`edited-summary-${arxivId}`).value
+                : null;
+
+            results.push({
+                arxiv_id: arxivId,
+                action: reviewResults[arxivId].action,
+                feedback: feedback || null,
+                edited_summary: editedSummary
+            });
+            {% endfor %}
+
+            try {
+                const response = await fetch(`/api/review/{{ session_id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ results })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`审核完成！\n通过: ${data.approved_count} 篇\n驳回: ${data.rejected_count} 篇`);
+                    location.reload();
+                } else {
+                    alert('提交失败: ' + (data.detail || '未知错误'));
+                }
+            } catch (error) {
+                alert('提交失败: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

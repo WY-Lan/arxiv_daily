@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arxiv Daily Push - Technical Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #7d8590;
+            --accent-blue: #58a6ff;
+            --accent-purple: #a371f7;
+            --accent-green: #3fb950;
+            --accent-orange: #f0883e;
+            --accent-red: #f85149;
+            --accent-cyan: #39c5cf;
+            --accent-yellow: #d29922;
+        }
+
+        body {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 30px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Architecture Grid */
+        .architecture {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* Layer Box */
+        .layer {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .layer-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .layer-header::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        .layer.data-source .layer-header { color: var(--accent-blue); }
+        .layer.data-source .layer-header::before { background: var(--accent-blue); }
+
+        .layer.core .layer-header { color: var(--accent-purple); }
+        .layer.core .layer-header::before { background: var(--accent-purple); }
+
+        .layer.storage .layer-header { color: var(--accent-green); }
+        .layer.storage .layer-header::before { background: var(--accent-green); }
+
+        .layer.publisher .layer-header { color: var(--accent-orange); }
+        .layer.publisher .layer-header::before { background: var(--accent-orange); }
+
+        .layer-content {
+            padding: 16px;
+        }
+
+        /* Component Box */
+        .component {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .component:last-child {
+            margin-bottom: 0;
+        }
+
+        .component-header {
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .component-header .icon {
+            font-size: 14px;
+        }
+
+        .component-body {
+            padding: 10px 12px;
+        }
+
+        /* Code Block Style */
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 11px;
+            overflow-x: auto;
+            margin-bottom: 8px;
+        }
+
+        .code-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .code-line {
+            display: block;
+            padding: 1px 0;
+        }
+
+        .keyword { color: var(--accent-purple); }
+        .class-name { color: var(--accent-yellow); }
+        .function { color: var(--accent-blue); }
+        .string { color: var(--accent-green); }
+        .comment { color: var(--text-secondary); }
+        .decorator { color: var(--accent-cyan); }
+        .param { color: var(--accent-orange); }
+
+        /* Method List */
+        .method-list {
+            list-style: none;
+        }
+
+        .method-list li {
+            padding: 4px 0;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .method-list li:last-child {
+            border-bottom: none;
+        }
+
+        .method-list .async {
+            color: var(--accent-cyan);
+            font-size: 10px;
+        }
+
+        .method-list .method-name {
+            color: var(--accent-blue);
+        }
+
+        .method-list .return-type {
+            color: var(--text-secondary);
+            margin-left: auto;
+            font-size: 10px;
+        }
+
+        /* Data Flow Section */
+        .flow-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Pipeline */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .pipeline-step {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .pipeline-step::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-blue);
+            font-size: 20px;
+        }
+
+        .pipeline-step:last-child::after {
+            display: none;
+        }
+
+        .step-header {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .step-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .step-details div {
+            padding: 2px 0;
+        }
+
+        /* Class Diagram */
+        .class-diagram {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .class-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .class-title {
+            padding: 12px;
+            background: rgba(163, 113, 247, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--accent-purple);
+            font-size: 12px;
+        }
+
+        .class-inheritance {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .class-attributes {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .class-methods {
+            padding: 10px 12px;
+        }
+
+        .attr-line, .method-line {
+            font-size: 11px;
+            padding: 2px 0;
+            font-family: inherit;
+        }
+
+        .attr-line .type { color: var(--accent-cyan); }
+        .attr-line .name { color: var(--text-primary); }
+
+        /* Database Schema */
+        .schema-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .schema-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .table-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .table-name {
+            padding: 10px 12px;
+            background: rgba(63, 185, 80, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--accent-green);
+            font-size: 12px;
+        }
+
+        .table-columns {
+            padding: 10px 12px;
+        }
+
+        .column-line {
+            font-size: 11px;
+            padding: 3px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .column-line .col-name { color: var(--text-primary); }
+        .column-line .col-type { color: var(--text-secondary); font-size: 10px; }
+        .column-line.pk .col-name { color: var(--accent-yellow); }
+        .column-line.pk::before {
+            content: '🔑';
+            font-size: 9px;
+            margin-right: 4px;
+        }
+
+        /* Config Section */
+        .config-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .config-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .config-title {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 12px;
+            color: var(--accent-cyan);
+        }
+
+        .config-item {
+            font-size: 11px;
+            padding: 4px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .config-item .key { color: var(--text-secondary); }
+        .config-item .value { color: var(--accent-green); }
+
+        /* Flow Arrows */
+        .flow-connections {
+            position: relative;
+            height: 40px;
+            margin: 20px 0;
+        }
+
+        .connection-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Annotations */
+        .annotation {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 4px;
+            border-left: 2px solid var(--accent-blue);
+        }
+
+        /* Dependencies */
+        .dependency-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .dependency-tag {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        /* MCP Protocol */
+        .mcp-section {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(57, 197, 207, 0.05);
+            border: 1px solid rgba(57, 197, 207, 0.2);
+            border-radius: 6px;
+        }
+
+        .mcp-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            margin-bottom: 10px;
+        }
+
+        .mcp-tools {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .mcp-tool {
+            font-size: 10px;
+            padding: 6px 10px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .architecture { grid-template-columns: repeat(2, 1fr); }
+            .class-diagram { grid-template-columns: repeat(2, 1fr); }
+            .schema-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .architecture { grid-template-columns: 1fr; }
+            .class-diagram { grid-template-columns: 1fr; }
+            .schema-grid { grid-template-columns: 1fr; }
+            .pipeline { flex-direction: column; }
+            .pipeline-step::after { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Arxiv Daily Push - Technical Architecture</h1>
+            <div class="subtitle">Multi-Agent System for AI Agent Paper Recommendations</div>
+        </div>
+
+        <!-- Main Architecture -->
+        <div class="architecture">
+            <!-- Data Sources Layer -->
+            <div class="layer data-source">
+                <div class="layer-header">📡 Data Sources</div>
+                <div class="layer-content">
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📄</span>
+                            ArxivClient
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="keyword">class</span> <span class="class-name">ArxivClient</span>:<br>
+                                <span class="code-line">&nbsp;&nbsp;<span class="keyword">async def</span> <span class="function">fetch_daily_papers</span>(<span class="param">self</span>) -> List[ArxivPaper]</span><br>
+                                <span class="code-line">&nbsp;&nbsp;<span class="keyword">async def</span> <span class="function">fetch_papers</span>(<span class="param">date_range_days</span>) -> List[ArxivPaper]</span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">fetch_daily_papers()</span> <span class="return-type">→ List[Paper]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">parse_entry()</span> <span class="return-type">→ ArxivPaper</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📊</span>
+                            SemanticScholarClient
+                        </div>
+                        <div class="component-body">
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">get_papers_batch()</span> <span class="return-type">→ Dict[str, Metrics]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">get_citation_count()</span> <span class="return-type">→ int</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">💻</span>
+                            PapersWithCodeClient
+                        </div>
+                        <div class="component-body">
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">search_paper_by_arxiv()</span> <span class="return-type">→ PWCMetrics</span></li>
+                                <li><span class="method-name">calculate_community_heat_score()</span> <span class="return-type">→ float</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">🔬</span>
+                            OpenAlexClient
+                        </div>
+                        <div class="component-body">
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">get_author_influence()</span> <span class="return-type">→ float</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Agents Layer -->
+            <div class="layer core">
+                <div class="layer-header">🤖 Agent Layer</div>
+                <div class="layer-content">
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">🔍</span>
+                            PaperFetcherAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="decorator">@register_agent</span><br>
+                                <span class="keyword">class</span> <span class="class-name">PaperFetcherAgent</span>(<span class="class-name">BaseAgent</span>):<br>
+                                <span class="code-line">&nbsp;&nbsp;name = <span class="string">"paper_fetcher"</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;role = <span class="class-name">AgentRole</span>.FETCHER</span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">execute()</span> <span class="return-type">→ Dict[str, Any]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">_enrich_paper_metadata()</span> <span class="return-type">→ List[Dict]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">_save_papers()</span> <span class="return-type">→ int</span></li>
+                            </ul>
+                            <div class="annotation">Fetches papers from multiple sources and enriches with citation/impact data</div>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">⭐</span>
+                            SelectionAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="decorator">@register_agent</span><br>
+                                <span class="keyword">class</span> <span class="class-name">SelectionAgent</span>(<span class="class-name">BaseAgent</span>):<br>
+                                <span class="code-line">&nbsp;&nbsp;name = <span class="string">"selection"</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;role = <span class="class-name">AgentRole</span>.SELECTOR</span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">execute()</span> <span class="return-type">→ Dict[str, Any]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">_evaluate_papers()</span> <span class="return-type">→ List[ScoredPaper]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">_evaluate_content_quality()</span> <span class="return-type">→ float</span></li>
+                                <li><span class="method-name">_select_top_papers()</span> <span class="return-type">→ List[Paper]</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📝</span>
+                            SummaryAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="decorator">@register_agent</span><br>
+                                <span class="keyword">class</span> <span class="class-name">SummaryAgent</span>(<span class="class-name">BaseAgent</span>):<br>
+                                <span class="code-line">&nbsp;&nbsp;name = <span class="string">"summary"</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;role = <span class="class-name">AgentRole</span>.SUMMARIZER</span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">execute()</span> <span class="return-type">→ Dict[str, Any]</span></li>
+                                <li><span class="async">async</span> <span class="method-name">_generate_summary()</span> <span class="return-type">→ Dict</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">🧠</span>
+                            BailianClient
+                        </div>
+                        <div class="component-body">
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">generate_json()</span> <span class="return-type">→ Dict</span></li>
+                                <li><span class="async">async</span> <span class="method-name">generate()</span> <span class="return-type">→ str</span></li>
+                            </ul>
+                            <div class="annotation">Alibaba Bailian API - qwen-max / qwen-plus</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage Layer -->
+            <div class="layer storage">
+                <div class="layer-header">💾 Storage Layer</div>
+                <div class="layer-content">
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">🗄️</span>
+                            Database (SQLite + SQLAlchemy)
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="comment"># storage/database.py</span><br>
+                                <span class="keyword">class</span> <span class="class-name">Database</span>:<br>
+                                <span class="code-line">&nbsp;&nbsp;engine: <span class="class-name">AsyncEngine</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;session: <span class="class-name">async_sessionmaker</span></span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">init()</span> <span class="return-type">→ None</span></li>
+                                <li><span class="async">async</span> <span class="method-name">save_paper()</span> <span class="return-type">→ Paper</span></li>
+                                <li><span class="async">async</span> <span class="method-name">get_paper_by_arxiv_id()</span> <span class="return-type">→ Paper</span></li>
+                                <li><span class="async">async</span> <span class="method-name">mark_papers_selected()</span> <span class="return-type">→ None</span></li>
+                                <li><span class="async">async</span> <span class="method-name">get_selected_papers()</span> <span class="return-type">→ List[Paper]</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📊</span>
+                            SQLAlchemy Models
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="keyword">class</span> <span class="class-name">Paper</span>(<span class="class-name">Base</span>):<br>
+                                <span class="code-line">&nbsp;&nbsp;__tablename__ = <span class="string">"papers"</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;id: <span class="class-name">Integer</span> (PK)</span><br>
+                                <span class="code-line">&nbsp;&nbsp;arxiv_id: <span class="class-name">String</span> (Unique)</span><br>
+                                <span class="code-line">&nbsp;&nbsp;title: <span class="class-name">String</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;abstract: <span class="class-name">Text</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;citation_count: <span class="class-name">Integer</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;total_score: <span class="class-name">Float</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">⚙️</span>
+                            AgentContext
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="keyword">class</span> <span class="class-name">AgentContext</span>:<br>
+                                <span class="code-line">&nbsp;&nbsp;session_id: <span class="class-name">str</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;timestamp: <span class="class-name">float</span></span><br>
+                                <span class="code-line">&nbsp;&nbsp;_data: <span class="class-name">Dict</span>[<span class="class-name">str</span>, <span class="class-name">Any</span>]</span>
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="method-name">set(key, value)</span> <span class="return-type">→ None</span></li>
+                                <li><span class="method-name">get(key)</span> <span class="return-type">→ Any</span></li>
+                            </ul>
+                            <div class="annotation">Shared state across agent execution pipeline</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Publisher Layer -->
+            <div class="layer publisher">
+                <div class="layer-header">📢 Publisher Layer</div>
+                <div class="layer-content">
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📋</span>
+                            NotionPublisherAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="decorator">@register_agent</span><br>
+                                <span class="keyword">class</span> <span class="class-name">NotionPublisherAgent</span>(<span class="class-name">BaseAgent</span>)
+                            </div>
+                            <div class="mcp-section">
+                                <div class="mcp-title">🔌 MCP Tools</div>
+                                <div class="mcp-tools">
+                                    <div class="mcp-tool">notion-create-pages</div>
+                                    <div class="mcp-tool">notion-update-page</div>
+                                    <div class="mcp-tool">notion-fetch</div>
+                                    <div class="mcp-tool">notion-search</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">💬</span>
+                            FeishuPublisherAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="comment"># tools/feishu_webhook.py</span><br>
+                                <span class="keyword">class</span> <span class="class-name">FeishuWebhookClient</span>:
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">send_collection_card()</span> <span class="return-type">→ Dict</span></li>
+                                <li><span class="async">async</span> <span class="method-name">send_review_card()</span> <span class="return-type">→ Dict</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📕</span>
+                            XHSPublisherAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="decorator">@register_agent</span><br>
+                                <span class="keyword">class</span> <span class="class-name">XHSPublisherAgent</span>(<span class="class-name">BaseAgent</span>)
+                            </div>
+                            <div class="mcp-section">
+                                <div class="mcp-title">🔌 MCP Tools</div>
+                                <div class="mcp-tools">
+                                    <div class="mcp-tool">publish_content</div>
+                                    <div class="mcp-tool">publish_with_video</div>
+                                    <div class="mcp-tool">list_feeds</div>
+                                    <div class="mcp-tool">search_feeds</div>
+                                </div>
+                            </div>
+                            <div class="annotation">Collection mode: aggregates papers into single post</div>
+                        </div>
+                    </div>
+
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="icon">📱</span>
+                            WeChatMPPublisherAgent
+                        </div>
+                        <div class="component-body">
+                            <div class="code-block">
+                                <span class="comment"># tools/wechat_publisher.py</span><br>
+                                <span class="keyword">class</span> <span class="class-name">WeChatPublisher</span>:
+                            </div>
+                            <ul class="method-list">
+                                <li><span class="async">async</span> <span class="method-name">create_draft()</span> <span class="return-type">→ Dict</span></li>
+                                <li><span class="async">async</span> <span class="method-name">get_access_token()</span> <span class="return-type">→ str</span></li>
+                            </ul>
+                            <div class="annotation">Draft creation only, manual publish required</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Flow -->
+        <div class="flow-section">
+            <div class="section-title">🔄 Execution Pipeline</div>
+            <div class="pipeline">
+                <div class="pipeline-step">
+                    <div class="step-header" style="color: var(--accent-blue);">1. Fetch</div>
+                    <div class="step-details">
+                        <div>PaperFetcherAgent.execute()</div>
+                        <div>→ arxiv_api.fetch_daily_papers()</div>
+                        <div>→ semantic_scholar.get_papers_batch()</div>
+                        <div>→ pwc.search_paper_by_arxiv()</div>
+                        <div>→ db.save_paper()</div>
+                    </div>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-header" style="color: var(--accent-purple);">2. Select</div>
+                    <div class="step-details">
+                        <div>SelectionAgent.execute()</div>
+                        <div>→ _evaluate_papers()</div>
+                        <div>&nbsp;&nbsp;↳ citation_score</div>
+                        <div>&nbsp;&nbsp;↳ influence_score</div>
+                        <div>&nbsp;&nbsp;↳ quality_score (LLM)</div>
+                        <div>&nbsp;&nbsp;↳ community_score</div>
+                        <div>→ _select_top_papers(n=10)</div>
+                    </div>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-header" style="color: var(--accent-green);">3. Summarize</div>
+                    <div class="step-details">
+                        <div>SummaryAgent.execute()</div>
+                        <div>→ llm.generate_json()</div>
+                        <div>&nbsp;&nbsp;↳ core_contributions</div>
+                        <div>&nbsp;&nbsp;↳ key_innovations</div>
+                        <div>&nbsp;&nbsp;↳ recommendation_reason</div>
+                        <div>→ context.set("summaries")</div>
+                    </div>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-header" style="color: var(--accent-orange);">4. Publish</div>
+                    <div class="step-details">
+                        <div>PublisherAgents.execute()</div>
+                        <div>→ Notion (MCP)</div>
+                        <div>→ Feishu (Webhook)</div>
+                        <div>→ XHS (MCP)</div>
+                        <div>→ WeChat (API)</div>
+                        <div>Collection mode aggregation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Diagrams -->
+        <div class="flow-section">
+            <div class="section-title">📐 Class Hierarchy</div>
+            <div class="class-diagram">
+                <div class="class-box">
+                    <div class="class-title">
+                        BaseAgent
+                        <div class="class-inheritance">abstract base class</div>
+                    </div>
+                    <div class="class-attributes">
+                        <div class="attr-line"><span class="type">str</span> <span class="name">name</span></div>
+                        <div class="attr-line"><span class="type">str</span> <span class="name">description</span></div>
+                        <div class="attr-line"><span class="type">AgentRole</span> <span class="name">role</span></div>
+                        <div class="attr-line"><span class="type">AgentConfig</span> <span class="name">config</span></div>
+                    </div>
+                    <div class="class-methods">
+                        <div class="method-line"><span class="keyword">async def</span> <span class="function">execute</span>(<span class="param">context</span>) -> Dict</div>
+                        <div class="method-line"><span class="keyword">async def</span> <span class="function">run</span>(<span class="param">context</span>) -> Dict</div>
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">validate_config</span>() -> bool</div>
+                    </div>
+                </div>
+
+                <div class="class-box">
+                    <div class="class-title">
+                        AgentContext
+                        <div class="class-inheritance">shared state container</div>
+                    </div>
+                    <div class="class-attributes">
+                        <div class="attr-line"><span class="type">str</span> <span class="name">session_id</span></div>
+                        <div class="attr-line"><span class="type">float</span> <span class="name">timestamp</span></div>
+                        <div class="attr-line"><span class="type">Dict[str, Any]</span> <span class="name">_data</span></div>
+                    </div>
+                    <div class="class-methods">
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">set</span>(<span class="param">key</span>, <span class="param">value</span>) -> None</div>
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">get</span>(<span class="param">key</span>) -> Any</div>
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">to_dict</span>() -> Dict</div>
+                    </div>
+                </div>
+
+                <div class="class-box">
+                    <div class="class-title">
+                        AgentRegistry
+                        <div class="class-inheritance">singleton pattern</div>
+                    </div>
+                    <div class="class-attributes">
+                        <div class="attr-line"><span class="type">Dict[str, Type]</span> <span class="name">_agents</span></div>
+                        <div class="attr-line"><span class="type">Dict[str, MCPConfig]</span> <span class="name">_mcps</span></div>
+                        <div class="attr-line"><span class="type">Dict[str, SkillConfig]</span> <span class="name">_skills</span></div>
+                    </div>
+                    <div class="class-methods">
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">register</span>(<span class="param">agent_class</span>) -> None</div>
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">get_agent</span>(<span class="param">name</span>) -> BaseAgent</div>
+                        <div class="method-line"><span class="keyword">def</span> <span class="function">list_agents</span>() -> List[str]</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Schema -->
+        <div class="schema-section">
+            <div class="section-title">🗄️ Database Schema</div>
+            <div class="schema-grid">
+                <div class="table-box">
+                    <div class="table-name">papers</div>
+                    <div class="table-columns">
+                        <div class="column-line pk"><span class="col-name">id</span> <span class="col-type">INTEGER PK</span></div>
+                        <div class="column-line"><span class="col-name">arxiv_id</span> <span class="col-type">VARCHAR(50) UNIQUE</span></div>
+                        <div class="column-line"><span class="col-name">title</span> <span class="col-type">VARCHAR(500)</span></div>
+                        <div class="column-line"><span class="col-name">authors</span> <span class="col-type">JSON</span></div>
+                        <div class="column-line"><span class="col-name">abstract</span> <span class="col-type">TEXT</span></div>
+                        <div class="column-line"><span class="col-name">categories</span> <span class="col-type">JSON</span></div>
+                        <div class="column-line"><span class="col-name">citation_count</span> <span class="col-type">INTEGER</span></div>
+                        <div class="column-line"><span class="col-name">influence_score</span> <span class="col-type">FLOAT</span></div>
+                        <div class="column-line"><span class="col-name">quality_score</span> <span class="col-type">FLOAT</span></div>
+                        <div class="column-line"><span class="col-name">community_score</span> <span class="col-type">FLOAT</span></div>
+                        <div class="column-line"><span class="col-name">total_score</span> <span class="col-type">FLOAT</span></div>
+                        <div class="column-line"><span class="col-name">is_selected</span> <span class="col-type">BOOLEAN</span></div>
+                        <div class="column-line"><span class="col-name">published_date</span> <span class="col-type">DATE</span></div>
+                        <div class="column-line"><span class="col-name">created_at</span> <span class="col-type">TIMESTAMP</span></div>
+                    </div>
+                </div>
+
+                <div class="table-box">
+                    <div class="table-name">publish_records</div>
+                    <div class="table-columns">
+                        <div class="column-line pk"><span class="col-name">id</span> <span class="col-type">INTEGER PK</span></div>
+                        <div class="column-line"><span class="col-name">paper_id</span> <span class="col-type">INTEGER FK</span></div>
+                        <div class="column-line"><span class="col-name">platform</span> <span class="col-type">VARCHAR(50)</span></div>
+                        <div class="column-line"><span class="col-name">status</span> <span class="col-type">VARCHAR(20)</span></div>
+                        <div class="column-line"><span class="col-name">external_id</span> <span class="col-type">VARCHAR(200)</span></div>
+                        <div class="column-line"><span class="col-name">error_message</span> <span class="col-type">TEXT</span></div>
+                        <div class="column-line"><span class="col-name">published_at</span> <span class="col-type">TIMESTAMP</span></div>
+                    </div>
+                </div>
+
+                <div class="table-box">
+                    <div class="table-name">agent_executions</div>
+                    <div class="table-columns">
+                        <div class="column-line pk"><span class="col-name">id</span> <span class="col-type">INTEGER PK</span></div>
+                        <div class="column-line"><span class="col-name">session_id</span> <span class="col-type">VARCHAR(100)</span></div>
+                        <div class="column-line"><span class="col-name">agent_name</span> <span class="col-type">VARCHAR(50)</span></div>
+                        <div class="column-line"><span class="col-name">status</span> <span class="col-type">VARCHAR(20)</span></div>
+                        <div class="column-line"><span class="col-name">input_data</span> <span class="col-type">JSON</span></div>
+                        <div class="column-line"><span class="col-name">output_data</span> <span class="col-type">JSON</span></div>
+                        <div class="column-line"><span class="col-name">started_at</span> <span class="col-type">TIMESTAMP</span></div>
+                        <div class="column-line"><span class="col-name">completed_at</span> <span class="col-type">TIMESTAMP</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div class="config-section">
+            <div class="section-title">⚙️ Configuration (Pydantic Settings)</div>
+            <div class="config-grid">
+                <div class="config-box">
+                    <div class="config-title">LLM Configuration</div>
+                    <div class="config-item"><span class="key">LLM_PROVIDER</span> <span class="value">"bailian"</span></div>
+                    <div class="config-item"><span class="key">MODEL_SELECTION</span> <span class="value">"qwen-max"</span></div>
+                    <div class="config-item"><span class="key">MODEL_SUMMARY</span> <span class="value">"qwen-max"</span></div>
+                    <div class="config-item"><span class="key">MODEL_PUBLISHER</span> <span class="value">"qwen-plus"</span></div>
+                    <div class="config-item"><span class="key">BAILIAN_API_KEY</span> <span class="value">${env}</span></div>
+                </div>
+
+                <div class="config-box">
+                    <div class="config-title">Selection Weights</div>
+                    <div class="config-item"><span class="key">citations</span> <span class="value">0.25</span></div>
+                    <div class="config-item"><span class="key">author_influence</span> <span class="value">0.20</span></div>
+                    <div class="config-item"><span class="key">content_quality</span> <span class="value">0.35</span></div>
+                    <div class="config-item"><span class="key">community_heat</span> <span class="value">0.20</span></div>
+                    <div class="config-item"><span class="key">DAILY_PAPER_COUNT</span> <span class="value">10</span></div>
+                </div>
+
+                <div class="config-box">
+                    <div class="config-title">Schedule Configuration</div>
+                    <div class="config-item"><span class="key">SCHEDULE_HOUR</span> <span class="value">9</span></div>
+                    <div class="config-item"><span class="key">SCHEDULE_MINUTE</span> <span class="value">0</span></div>
+                    <div class="config-item"><span class="key">TIMEZONE</span> <span class="value">"Asia/Shanghai"</span></div>
+                </div>
+
+                <div class="config-box">
+                    <div class="config-title">Platform API Keys</div>
+                    <div class="config-item"><span class="key">NOTION_API_KEY</span> <span class="value">${env}</span></div>
+                    <div class="config-item"><span class="key">FEISHU_WEBHOOK_URL</span> <span class="value">${env}</span></div>
+                    <div class="config-item"><span class="key">WECHAT_APP_ID</span> <span class="value">${env}</span></div>
+                    <div class="config-item"><span class="key">WECHAT_APP_SECRET</span> <span class="value">${env}</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

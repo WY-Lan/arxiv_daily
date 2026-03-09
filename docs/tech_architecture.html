@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arxiv Daily Push - 技术架构图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #8b92b9;
+            font-size: 1.1rem;
+        }
+
+        /* Architecture Container */
+        .architecture {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 30px;
+            position: relative;
+        }
+
+        /* Layer Cards */
+        .layer {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            position: relative;
+            animation: fadeInUp 0.8s ease backwards;
+        }
+
+        .layer:nth-child(1) { animation-delay: 0.1s; }
+        .layer:nth-child(2) { animation-delay: 0.2s; }
+        .layer:nth-child(3) { animation-delay: 0.3s; }
+        .layer:nth-child(4) { animation-delay: 0.4s; }
+        .layer:nth-child(5) { animation-delay: 0.5s; }
+
+        .layer-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            display: inline-block;
+        }
+
+        .layer.data-source .layer-title {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(56, 189, 248, 0.05));
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .layer.agent-layer .layer-title {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.05));
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+
+        .layer.storage-layer .layer-title {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.05));
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .layer.publisher-layer .layer-title {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(249, 115, 22, 0.05));
+            color: #f97316;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .layer.scheduler-layer .layer-title {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(236, 72, 153, 0.05));
+            color: #ec4899;
+            border: 1px solid rgba(236, 72, 153, 0.3);
+        }
+
+        /* Component Cards */
+        .component {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .component:hover {
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .component-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .data-source .component-icon {
+            background: linear-gradient(135deg, #38bdf8, #0284c7);
+        }
+
+        .agent-layer .component-icon {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+        }
+
+        .storage-layer .component-icon {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+        }
+
+        .publisher-layer .component-icon {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+        }
+
+        .scheduler-layer .component-icon {
+            background: linear-gradient(135deg, #ec4899, #db2777);
+        }
+
+        .component h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .component p {
+            font-size: 0.75rem;
+            color: #8b92b9;
+            line-height: 1.4;
+        }
+
+        /* Flow Arrows */
+        .flow-arrows {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            transform: translateY(-50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .arrow-connector {
+            position: absolute;
+            top: 50%;
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.5), transparent);
+            transform: translateY(-50%);
+        }
+
+        /* Score System Section */
+        .score-system {
+            margin-top: 50px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            animation: fadeInUp 0.8s ease 0.6s backwards;
+        }
+
+        .score-title {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #fff;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .score-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .score-item:hover {
+            transform: scale(1.05);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .score-value {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .score-label {
+            font-size: 0.85rem;
+            color: #8b92b9;
+        }
+
+        /* Tech Stack */
+        .tech-stack {
+            margin-top: 50px;
+            text-align: center;
+            animation: fadeInUp 0.8s ease 0.7s backwards;
+        }
+
+        .tech-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #8b92b9;
+        }
+
+        .tech-badges {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .tech-badge {
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tech-badge:hover {
+            background: rgba(102, 126, 234, 0.25);
+            transform: translateY(-2px);
+        }
+
+        /* Pipeline Flow */
+        .pipeline-flow {
+            margin-top: 50px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            animation: fadeInUp 0.8s ease 0.5s backwards;
+        }
+
+        .pipeline-title {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+
+        .pipeline-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .pipeline-steps::before {
+            content: '';
+            position: absolute;
+            top: 35px;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, #38bdf8, #a855f7, #22c55e, #f97316);
+            border-radius: 3px;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .step-number {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            border: 3px solid;
+            background: #0f0f23;
+        }
+
+        .step:nth-child(1) .step-number {
+            border-color: #38bdf8;
+            color: #38bdf8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+        }
+
+        .step:nth-child(2) .step-number {
+            border-color: #a855f7;
+            color: #a855f7;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+        }
+
+        .step:nth-child(3) .step-number {
+            border-color: #22c55e;
+            color: #22c55e;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .step:nth-child(4) .step-number {
+            border-color: #f97316;
+            color: #f97316;
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+        }
+
+        .step-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .step-desc {
+            font-size: 0.75rem;
+            color: #8b92b9;
+            text-align: center;
+            max-width: 120px;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .architecture {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .architecture {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .score-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .architecture {
+                grid-template-columns: 1fr;
+            }
+            .score-grid {
+                grid-template-columns: 1fr;
+            }
+            .pipeline-steps {
+                flex-direction: column;
+                gap: 30px;
+            }
+            .pipeline-steps::before {
+                display: none;
+            }
+        }
+
+        /* Flow Lines Animation */
+        .flow-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            animation: flowAnimation 2s linear infinite;
+        }
+
+        @keyframes flowAnimation {
+            0% {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📚 Arxiv Daily Push</h1>
+            <p>AI Agent 论文推荐系统 - 技术架构图</p>
+        </div>
+
+        <!-- Main Architecture -->
+        <div class="architecture">
+            <!-- Data Source Layer -->
+            <div class="layer data-source">
+                <div class="layer-title">📡 数据源层</div>
+                <div class="component">
+                    <div class="component-icon">📄</div>
+                    <h4>arXiv API</h4>
+                    <p>获取 AI Agent 相关论文元数据</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📊</div>
+                    <h4>Semantic Scholar</h4>
+                    <p>论文引用数和影响力数据</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">🔬</div>
+                    <h4>OpenAlex</h4>
+                    <p>作者影响力评估</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">💻</div>
+                    <h4>Papers with Code</h4>
+                    <p>社区热度和代码可用性</p>
+                </div>
+            </div>
+
+            <!-- Agent Layer -->
+            <div class="layer agent-layer">
+                <div class="layer-title">🤖 Agent 处理层</div>
+                <div class="component">
+                    <div class="component-icon">🔍</div>
+                    <h4>PaperFetcherAgent</h4>
+                    <p>从多源获取论文并丰富元数据</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">⭐</div>
+                    <h4>SelectionAgent</h4>
+                    <p>四维评估体系筛选高质量论文</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📝</div>
+                    <h4>SummaryAgent</h4>
+                    <p>生成结构化摘要和推荐理由</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">🧠</div>
+                    <h4>LLM Client</h4>
+                    <p>通义千问内容评估和生成</p>
+                </div>
+            </div>
+
+            <!-- Storage Layer -->
+            <div class="layer storage-layer">
+                <div class="layer-title">💾 存储层</div>
+                <div class="component">
+                    <div class="component-icon">🗄️</div>
+                    <h4>SQLite Database</h4>
+                    <p>异步 SQLAlchemy ORM</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📑</div>
+                    <h4>Papers Table</h4>
+                    <p>论文元数据和评分</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📤</div>
+                    <h4>Publish Records</h4>
+                    <p>发布历史记录</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">⚙️</div>
+                    <h4>Agent Executions</h4>
+                    <p>执行日志和配置</p>
+                </div>
+            </div>
+
+            <!-- Publisher Layer -->
+            <div class="layer publisher-layer">
+                <div class="layer-title">📢 发布层</div>
+                <div class="component">
+                    <div class="component-icon">📋</div>
+                    <h4>Notion</h4>
+                    <p>知识库同步 MCP</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">💬</div>
+                    <h4>Feishu</h4>
+                    <p>Webhook 卡片消息</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📕</div>
+                    <h4>Xiaohongshu</h4>
+                    <p>图文合集发布 MCP</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📱</div>
+                    <h4>WeChat MP</h4>
+                    <p>公众号草稿创建</p>
+                </div>
+            </div>
+
+            <!-- Scheduler Layer -->
+            <div class="layer scheduler-layer">
+                <div class="layer-title">⏰ 调度层</div>
+                <div class="component">
+                    <div class="component-icon">🎯</div>
+                    <h4>DailyPushScheduler</h4>
+                    <p>定时任务调度 APScheduler</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">🔄</div>
+                    <h4>OrchestratorAgent</h4>
+                    <p>多 Agent 编排执行</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">📋</div>
+                    <h4>Agent Context</h4>
+                    <p>共享状态管理</p>
+                </div>
+                <div class="component">
+                    <div class="component-icon">🔧</div>
+                    <h4>AgentRegistry</h4>
+                    <p>Agent 注册和发现</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Flow -->
+        <div class="pipeline-flow">
+            <div class="pipeline-title">🔄 数据处理流水线</div>
+            <div class="pipeline-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">获取</div>
+                    <div class="step-desc">多源数据抓取</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">筛选</div>
+                    <div class="step-desc">四维评估体系</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">生成</div>
+                    <div class="step-desc">LLM 内容生成</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">发布</div>
+                    <div class="step-desc">多平台同步</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4D Score System -->
+        <div class="score-system">
+            <div class="score-title">📊 四维评分系统</div>
+            <div class="score-grid">
+                <div class="score-item">
+                    <div class="score-value">📈</div>
+                    <div class="score-label">引用数 Citation</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value">👥</div>
+                    <div class="score-label">作者影响力 Author</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value">✨</div>
+                    <div class="score-label">内容质量 Quality</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value">🔥</div>
+                    <div class="score-label">社区热度 Community</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="tech-stack">
+            <div class="tech-title">🛠️ 技术栈</div>
+            <div class="tech-badges">
+                <span class="tech-badge">Python 3.11+</span>
+                <span class="tech-badge">AsyncIO</span>
+                <span class="tech-badge">SQLAlchemy 2.0</span>
+                <span class="tech-badge">Pydantic</span>
+                <span class="tech-badge">Loguru</span>
+                <span class="tech-badge">APScheduler</span>
+                <span class="tech-badge">MCP Protocol</span>
+                <span class="tech-badge">Qwen LLM</span>
+                <span class="tech-badge">FastAPI</span>
+                <span class="tech-badge">Feedparser</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add interactive hover effects
+        document.querySelectorAll('.component').forEach(component => {
+            component.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px) scale(1.02)';
+            });
+            component.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+
+        // Animate score items on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animation = 'fadeInUp 0.6s ease forwards';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.score-item').forEach(item => {
+            observer.observe(item);
+        });
+    </script>
+</body>
+</html>

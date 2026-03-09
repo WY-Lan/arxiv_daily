@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  arxiv-daily:
+    build: .
+    container_name: arxiv-daily
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      # Data persistence
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+      # Config files (easy to modify and restart)
+      - ./config:/app/config
+    environment:
+      - TZ=Asia/Shanghai
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

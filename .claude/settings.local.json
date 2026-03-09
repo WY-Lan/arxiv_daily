@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "WebSearch",
+      "mcp__xiaohongshu-mcp__like_feed",
+      "mcp__xiaohongshu-mcp__search_feeds",
+      "mcp__github__get_file_contents"
+    ]
+  }
+}
