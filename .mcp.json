@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xiaohongshu-mcp": {
+      "command": "/Users/wuyang.lan/Downloads/arxiv_daily/mcp_servers/xiaohongshu-mcp/xiaohongshu-mcp-darwin-arm64",
+      "args": [],
+      "env": {}
+    }
+  }
+}

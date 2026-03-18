@@ -236,17 +236,17 @@ class SelectionAgent(BaseAgent):
 
         # Initialize social media monitoring
         social_integrator = None
+        social_aggregator = None  # 统一的 aggregator 变量
         wechat_integrator = None
 
         if settings.ENABLE_SOCIAL_MONITORING:
             if settings.SOCIAL_MEDIA_REGION == "china":
                 # 国内平台监控
                 from tools.social_monitor_cn import CNSocialMediaAggregator, CNSocialSignalIntegrator
-                cn_aggregator = CNSocialMediaAggregator(
-                    xiaohongshu_cookie=settings.XIAOHONGSHU_COOKIE,
-                    jike_token=settings.JIKE_API_TOKEN
+                social_aggregator = CNSocialMediaAggregator(
+                    xiaohongshu_cookie=settings.XIAOHONGSHU_COOKIE
                 )
-                social_integrator = CNSocialSignalIntegrator(cn_aggregator)
+                social_integrator = CNSocialSignalIntegrator(social_aggregator)
                 logger.info("使用国内社交媒体监控（知乎、掘金、CSDN、小红书、即刻）")
             else:
                 # 国际平台监控
@@ -288,7 +288,7 @@ class SelectionAgent(BaseAgent):
         # 0a. 检查微信公众号热点
         if wechat_integrator:
             try:
-                wechat_hot_ids = await wechat_aggregator.get_wechat_only_recommendations(
+                wechat_hot_ids = await wechat_integrator.get_wechat_only_recommendations(
                     min_score=0.5,
                     limit=10
                 )
@@ -298,7 +298,7 @@ class SelectionAgent(BaseAgent):
                 logger.warning(f"微信公众号热点检查失败: {e}")
 
         # 0b. 检查其他社交媒体热点
-        if social_integrator:
+        if social_integrator and social_aggregator:
             hot_papers = await social_aggregator.get_top_trending_papers(hours=48, limit=20)
             social_hot_ids = [p.arxiv_id for p in hot_papers if p.trending_score >= 0.6]
             hot_paper_ids.extend(social_hot_ids)
@@ -792,6 +792,7 @@ class SummaryAgent(BaseAgent):
     async def _generate_summary(self, paper: Dict) -> Dict[str, Any]:
         """为单篇论文生成摘要"""
         from config.prompts import load_prompt
+        from config.settings import settings
 
         prompt = load_prompt("summary")
 

@@ -1,11 +1,18 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "WebSearch",
       "mcp__xiaohongshu-mcp__like_feed",
       "mcp__xiaohongshu-mcp__search_feeds",
-      "mcp__github__get_file_contents"
-    ]
-  }
+      "mcp__xiaohongshu-mcp__publish_content",
+      "mcp__xiaohongshu-mcp__check_login_status",
+      "mcp__xiaohongshu-mcp__list_feeds",
+      "mcp__xiaohongshu-mcp__get_feed_detail",
+      "mcp__github__get_file_contents",
+      "Bash(curl -s --max-time 30 \"https://modelscope.cn/api/v1/models?sort=downloads&page=1&limit=20\" 2>/dev/null | python3 -m json.tool 2>/dev/null || curl -s --max-time 30 \"https://modelscope.cn/api/v1/models?sort=downloads&page=1&limit=20\"hia)",
+      "Bash"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "enableAllProjectMcpServers": true
 }

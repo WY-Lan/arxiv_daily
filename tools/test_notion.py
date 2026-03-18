@@ -98,31 +98,48 @@ async def test_notion_config():
     else:
         checks.append(("API Key", "❌ Missing", "Set NOTION_API_KEY in .env"))
 
-    # Check Database ID
+    # Check Parent Page ID (for daily page mode - recommended)
+    if settings.NOTION_PARENT_PAGE_ID:
+        checks.append(("Parent Page ID", "✅ Configured", settings.NOTION_PARENT_PAGE_ID))
+        checks.append(("Publish Mode", "📋 Daily Page", "Recommended mode"))
+    else:
+        checks.append(("Parent Page ID", "⚠️ Not set", "Set for daily page mode (recommended)"))
+
+    # Check Database ID (for legacy database mode)
     if settings.NOTION_DATABASE_ID:
         checks.append(("Database ID", "✅ Configured", settings.NOTION_DATABASE_ID))
+        if not settings.NOTION_PARENT_PAGE_ID:
+            checks.append(("Publish Mode", "📊 Database", "Legacy mode"))
     else:
-        checks.append(("Database ID", "❌ Missing", "Set NOTION_DATABASE_ID in .env"))
+        checks.append(("Database ID", "⚠️ Not set", "Set for database mode (optional)"))
 
     print()
     for name, status, detail in checks:
         print(f"  {name}: {status}")
         print(f"    → {detail}")
 
-    all_configured = settings.NOTION_API_KEY and settings.NOTION_DATABASE_ID
+    can_publish = settings.NOTION_API_KEY and (settings.NOTION_PARENT_PAGE_ID or settings.NOTION_DATABASE_ID)
 
     print()
-    if all_configured:
+    if can_publish:
         print("✅ Notion is properly configured!")
+        if settings.NOTION_PARENT_PAGE_ID:
+            print("   Will use: Daily Page Mode (recommended)")
+        else:
+            print("   Will use: Database Mode (legacy)")
     else:
         print("❌ Notion configuration incomplete.")
-        print("\nTo configure Notion:")
+        print("\nTo configure Notion for Daily Page Mode (recommended):")
         print("  1. Create a Notion integration: https://www.notion.so/my-integrations")
         print("  2. Copy the Internal Token to NOTION_API_KEY")
-        print("  3. Create a database and share it with your integration")
-        print("  4. Copy the database ID to NOTION_DATABASE_ID")
+        print("  3. Create a page to serve as the parent for daily pages")
+        print("  4. Share the page with your integration")
+        print("  5. Copy the page ID to NOTION_PARENT_PAGE_ID")
+        print("\nFor Database Mode (legacy):")
+        print("  - Create a database and share it with your integration")
+        print("  - Copy the database ID to NOTION_DATABASE_ID")
 
-    return all_configured
+    return can_publish
 
 
 async def show_sample_data():
@@ -143,41 +160,76 @@ async def show_sample_data():
 
 async def prepare_notion_page():
     """Prepare and display Notion page data."""
-    from tools.notion_publisher import publish_paper_to_notion, format_notion_content
+    from tools.notion_publisher import (
+        publish_paper_to_notion,
+        format_notion_content,
+        prepare_daily_page,
+        format_daily_page_content
+    )
 
     paper = create_sample_paper()
     summary = create_sample_summary()
 
-    print("\n" + "=" * 60)
-    print("Preparing Notion Page")
-    print("=" * 60)
+    # Check which mode is configured
+    if settings.NOTION_PARENT_PAGE_ID:
+        print("\n" + "=" * 60)
+        print("Preparing Daily Page (Recommended Mode)")
+        print("=" * 60)
 
-    # Prepare page data
-    page_data = publish_paper_to_notion(
-        paper=paper,
-        summary=summary,
-        database_id=settings.NOTION_DATABASE_ID or "test-database-id"
-    )
+        # Fix authors format
+        paper["authors"] = json.loads(paper["authors"]) if isinstance(paper["authors"], str) else paper["authors"]
 
-    print("\n📄 Properties:")
-    print("-" * 40)
-    for key, value in page_data["properties"].items():
-        if isinstance(value, str) and len(value) > 60:
-            print(f"  {key}: {value[:60]}...")
-        else:
-            print(f"  {key}: {value}")
+        # Prepare daily page data
+        page_data = prepare_daily_page(
+            papers=[paper],
+            summaries=[summary],
+            parent_page_id=settings.NOTION_PARENT_PAGE_ID
+        )
 
-    # Format content
-    content = format_notion_content(paper, summary)
-    print("\n📝 Page Content:")
-    print("-" * 40)
-    print(content[:500] + "..." if len(content) > 500 else content)
+        print(f"\n📄 Title: {page_data['title']}")
+        print(f"   Parent Page ID: {page_data['parent_page_id']}")
+        print(f"   Paper Count: {page_data['paper_count']}")
 
-    print("\n✅ Page data prepared successfully!")
-    print("\nTo actually publish, run the main pipeline in Claude Code:")
-    print("  python main.py run")
+        print("\n📝 Page Content Preview:")
+        print("-" * 40)
+        content = page_data['content']
+        print(content[:800] + "..." if len(content) > 800 else content)
 
-    return page_data
+        print("\n✅ Daily page data prepared successfully!")
+        return page_data
+
+    elif settings.NOTION_DATABASE_ID:
+        print("\n" + "=" * 60)
+        print("Preparing Database Entry (Legacy Mode)")
+        print("=" * 60)
+
+        # Prepare page data
+        page_data = publish_paper_to_notion(
+            paper=paper,
+            summary=summary,
+            database_id=settings.NOTION_DATABASE_ID
+        )
+
+        print("\n📄 Properties:")
+        print("-" * 40)
+        for key, value in page_data["properties"].items():
+            if isinstance(value, str) and len(value) > 60:
+                print(f"  {key}: {value[:60]}...")
+            else:
+                print(f"  {key}: {value}")
+
+        # Format content
+        content = format_notion_content(paper, summary)
+        print("\n📝 Page Content:")
+        print("-" * 40)
+        print(content[:500] + "..." if len(content) > 500 else content)
+
+        print("\n✅ Database entry data prepared successfully!")
+        return page_data
+
+    else:
+        print("❌ Neither NOTION_PARENT_PAGE_ID nor NOTION_DATABASE_ID is configured")
+        return None
 
 
 async def test_agent_publish():

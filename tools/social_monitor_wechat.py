@@ -43,9 +43,9 @@ class WechatArticle:
 @dataclass
 class WechatSignal:
     """微信公众号社交信号。"""
-    platform: str = "wechat"
     arxiv_id: Optional[str]
     paper_title: str
+    platform: str = "wechat"
     articles: List[WechatArticle] = field(default_factory=list)
     mention_count: int = 0
     engagement_score: float = 0.0

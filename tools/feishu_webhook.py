@@ -173,9 +173,13 @@ class FeishuWebhookClient:
         for i, paper in enumerate(papers, 1):
             title = paper.get("title", "Unknown Title")
             arxiv_id = paper.get("arxiv_id", "")
-            authors = paper.get("authors", [])[:3]
-            author_str = ", ".join(authors) if authors else "Unknown"
-            summary = paper.get("summary", paper.get("abstract", ""))[:200]
+            authors = paper.get("authors", [])
+            # Show up to 6 authors, add "等" if there are more
+            if len(authors) > 6:
+                author_str = ", ".join(authors[:6]) + " 等"
+            else:
+                author_str = ", ".join(authors) if authors else "Unknown"
+            summary = paper.get("summary", paper.get("abstract", ""))
             highlights = paper.get("highlights", [])
             arxiv_url = f"https://arxiv.org/abs/{arxiv_id}"
             code_url = paper.get("code_url", paper.get("github_url", ""))
@@ -183,7 +187,7 @@ class FeishuWebhookClient:
             # Paper number and title
             elements.append({
                 "tag": "markdown",
-                "content": f"### {i}. {title[:50]}{'...' if len(title) > 50 else ''}"
+                "content": f"### {i}. {title}"
             })
 
             # Authors and tags
@@ -197,7 +201,7 @@ class FeishuWebhookClient:
             # Summary
             elements.append({
                 "tag": "markdown",
-                "content": f"💡 {summary}..."
+                "content": f"💡 {summary}"
             })
 
             # Highlights if available

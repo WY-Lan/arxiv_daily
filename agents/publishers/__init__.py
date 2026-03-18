@@ -5,7 +5,7 @@ Each agent handles the specific requirements and APIs of its platform.
 """
 import json
 from abc import abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from loguru import logger
 
@@ -91,19 +91,23 @@ class NotionPublisherAgent(BasePublisherAgent):
     Notion 发布 Agent
 
     职责：
-    1. 将论文信息同步到 Notion 数据库
-    2. 创建结构化的论文条目
-    3. 支持标签、分类等元数据
+    1. 将每日精选论文整合到一个 Notion 页面（推荐）
+    2. 或将每篇论文作为数据库条目发布（传统模式）
+
+    发布模式：
+    - 日报模式（推荐）: 设置 NOTION_PARENT_PAGE_ID，创建每日页面
+    - 数据库模式: 仅设置 NOTION_DATABASE_ID，逐篇添加到数据库
     """
 
     name = "notion_publisher"
-    description = "发布论文到 Notion 数据库"
+    description = "发布论文到 Notion"
 
     async def execute(self, context: AgentContext) -> Dict[str, Any]:
         """
-        Execute publishing flow - publish all papers to Notion database.
+        Execute publishing flow.
 
-        批量发布模式：将所有论文作为独立的数据库条目发布
+        优先使用日报模式（如果设置了 NOTION_PARENT_PAGE_ID），
+        否则回退到数据库模式。
         """
         from tools.llm_client import get_llm_client
 
@@ -115,24 +119,351 @@ class NotionPublisherAgent(BasePublisherAgent):
             logger.warning("No summaries to publish for Notion")
             return {"published": [], "count": 0}
 
-        # Check Notion configuration
-        if not settings.NOTION_DATABASE_ID:
-            logger.warning("Notion database ID not configured, skipping")
+        # Determine publishing mode
+        if settings.NOTION_PARENT_PAGE_ID:
+            logger.info("Using daily page mode for Notion publishing")
+            return await self._publish_daily_page(summaries)
+        elif settings.NOTION_DATABASE_ID:
+            logger.info("Using database mode for Notion publishing")
+            return await self._publish_to_database(summaries)
+        else:
+            logger.warning("Notion not configured (need NOTION_PARENT_PAGE_ID or NOTION_DATABASE_ID)")
             return {"published": [], "count": 0, "error": "Notion not configured"}
 
-        published = []
-        for item in summaries:
-            try:
-                result = await self.publish(item)
-                if result.get("status") == "success":
-                    published.append(result)
-            except Exception as e:
-                logger.error(f"Failed to publish {item.get('paper', {}).get('arxiv_id')}: {e}")
+    async def _publish_daily_page(self, summaries: List[Dict]) -> Dict[str, Any]:
+        """
+        Publish all papers as a single daily page.
 
-        return {
-            "published": published,
-            "count": len(published)
-        }
+        Args:
+            summaries: List of {paper, summary} dicts
+
+        Returns:
+            Dict with publish result
+        """
+        from tools.notion_publisher import prepare_daily_page
+
+        papers = [item.get("paper", {}) for item in summaries]
+        summary_data = [item.get("summary", {}) for item in summaries]
+
+        # Prepare daily page data
+        page_data = prepare_daily_page(
+            papers=papers,
+            summaries=summary_data,
+            parent_page_id=settings.NOTION_PARENT_PAGE_ID
+        )
+
+        logger.info(f"Creating daily page: {page_data['title']}")
+
+        # Create the page using Notion MCP
+        result = await self._create_notion_page(page_data)
+
+        return result
+
+    async def _create_notion_page(self, page_data: Dict) -> Dict[str, Any]:
+        """
+        Create a Notion page using MCP.
+
+        Args:
+            page_data: Dict with parent_page_id, title, content
+
+        Returns:
+            Dict with publish result
+        """
+        try:
+            # Use Notion MCP tool to create the page
+            result = await self._call_notion_create_page(
+                parent_page_id=page_data["parent_page_id"],
+                title=page_data["title"],
+                content=page_data["content"]
+            )
+
+            if result.get("status") == "success":
+                logger.info(f"Successfully created Notion page: {result.get('url')}")
+                return {
+                    "published": [result],
+                    "count": 1,
+                    "papers_count": page_data.get("paper_count", 0),
+                    "mode": "daily_page",
+                    "url": result.get("url", "")
+                }
+            else:
+                logger.error(f"Failed to create Notion page: {result.get('error')}")
+                return {
+                    "published": [],
+                    "count": 0,
+                    "error": result.get("error")
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to create daily page: {e}")
+            return {"published": [], "count": 0, "error": str(e)}
+
+    async def _call_notion_create_page(
+        self,
+        parent_page_id: str,
+        title: str,
+        content: str
+    ) -> Dict[str, Any]:
+        """
+        Call Notion MCP to create a page under a parent page.
+
+        Uses the notion-client API directly.
+
+        Args:
+            parent_page_id: Parent page ID
+            title: Page title
+            content: Page content in markdown
+
+        Returns:
+            Dict with status and URL
+        """
+        from notion_client import AsyncClient
+
+        try:
+            async with AsyncClient(auth=settings.NOTION_API_KEY) as client:
+                # Create page with title and content
+                response = await client.pages.create(
+                    parent={"page_id": parent_page_id},
+                    properties={
+                        "title": {
+                            "title": [{"text": {"content": title}}]
+                        }
+                    }
+                )
+
+                page_id = response.get("id", "")
+                page_url = response.get("url", "")
+
+                # Add content blocks to the page
+                if content:
+                    await self._add_content_blocks(client, page_id, content)
+
+                logger.info(f"Created Notion page: {page_url}")
+
+                return {
+                    "status": "success",
+                    "page_id": page_id,
+                    "url": page_url
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to create Notion page: {e}")
+            return {
+                "status": "failed",
+                "error": str(e)
+            }
+
+    async def _add_content_blocks(
+        self,
+        client,
+        page_id: str,
+        content: str
+    ) -> None:
+        """
+        Add content blocks to a Notion page.
+
+        Converts markdown content to Notion blocks.
+
+        Args:
+            client: Notion async client
+            page_id: Page ID to add blocks to
+            content: Markdown content
+        """
+        # Split content into sections and create blocks
+        blocks = []
+
+        for line in content.split("\n"):
+            if not line.strip():
+                continue
+
+            # Handle headers
+            if line.startswith("### "):
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_3",
+                    "heading_3": {
+                        "rich_text": [{"type": "text", "text": {"content": line[4:]}}]
+                    }
+                })
+            elif line.startswith("## "):
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                        "rich_text": [{"type": "text", "text": {"content": line[3:]}}]
+                    }
+                })
+            elif line.startswith("# "):
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_1",
+                    "heading_1": {
+                        "rich_text": [{"type": "text", "text": {"content": line[2:]}}]
+                    }
+                })
+            elif line.startswith("---"):
+                blocks.append({
+                    "object": "block",
+                    "type": "divider",
+                    "divider": {}
+                })
+            elif line.startswith("- "):
+                # List item
+                text = self._extract_text_content(line[2:])
+                blocks.append({
+                    "object": "block",
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {
+                        "rich_text": self._parse_rich_text(text)
+                    }
+                })
+            else:
+                # Regular paragraph
+                text = self._extract_text_content(line)
+                if text:
+                    blocks.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": self._parse_rich_text(text)
+                        }
+                    })
+
+        # Add blocks in batches (Notion has a limit of 100 blocks per request)
+        if blocks:
+            batch_size = 50
+            for i in range(0, len(blocks), batch_size):
+                batch = blocks[i:i + batch_size]
+                try:
+                    await client.blocks.children.append(
+                        block_id=page_id,
+                        children=batch
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to add some blocks: {e}")
+
+    def _extract_text_content(self, line: str) -> str:
+        """Extract plain text from a line, preserving basic structure."""
+        # Remove markdown link syntax but keep text
+        import re
+        # [text](url) -> text
+        line = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', line)
+        # Remove bold/italic markers
+        line = line.replace("**", "").replace("__", "").replace("*", "").replace("_", "")
+        return line.strip()
+
+    def _parse_rich_text(self, text: str) -> List[Dict]:
+        """Parse text with potential links into rich text objects."""
+        import re
+
+        # Find all links in format [text](url)
+        pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+        parts = []
+        last_end = 0
+
+        for match in re.finditer(pattern, text):
+            # Add text before the link
+            if match.start() > last_end:
+                plain_text = text[last_end:match.start()]
+                if plain_text:
+                    parts.append({
+                        "type": "text",
+                        "text": {"content": plain_text}
+                    })
+
+            # Add the link
+            link_text = match.group(1)
+            link_url = match.group(2)
+            parts.append({
+                "type": "text",
+                "text": {
+                    "content": link_text,
+                    "link": {"url": link_url}
+                }
+            })
+            last_end = match.end()
+
+        # Add remaining text
+        if last_end < len(text):
+            remaining = text[last_end:]
+            if remaining:
+                parts.append({
+                    "type": "text",
+                    "text": {"content": remaining}
+                })
+
+        if not parts:
+            parts.append({
+                "type": "text",
+                "text": {"content": text}
+            })
+
+        return parts
+
+    async def _publish_to_database(self, summaries: List[Dict]) -> Dict[str, Any]:
+        """
+        Publish all papers as a single daily database entry.
+
+        Creates one row per day with all papers' content in the page body.
+        This is the recommended hybrid approach that combines database structure
+        with full paper content.
+
+        Args:
+            summaries: List of {paper, summary} dicts
+
+        Returns:
+            Dict with publish result
+        """
+        from tools.notion_publisher import prepare_daily_database_entry
+
+        if not summaries:
+            return {"published": [], "count": 0, "mode": "database_daily"}
+
+        # Extract papers and summaries from the input
+        papers = [item.get("paper") for item in summaries if item.get("paper")]
+        summary_data = [item.get("summary") for item in summaries if item.get("summary")]
+
+        if not papers:
+            logger.warning("No papers to publish to Notion")
+            return {"published": [], "count": 0, "mode": "database_daily"}
+
+        try:
+            # Prepare daily entry data with all papers
+            page_data = prepare_daily_database_entry(
+                papers=papers,
+                summaries=summary_data,
+                database_id=settings.NOTION_DATABASE_ID
+            )
+
+            logger.info(f"Publishing daily Notion entry: {page_data['title']} with {page_data['paper_count']} papers")
+
+            # Call Notion MCP to create the page
+            result = await self._call_notion_mcp(page_data, page_data.get("content", ""))
+
+            if result.get("status") == "success":
+                return {
+                    "published": [result],
+                    "count": 1,
+                    "paper_count": page_data["paper_count"],
+                    "mode": "database_daily",
+                    "url": result.get("url")
+                }
+            else:
+                return {
+                    "published": [],
+                    "count": 0,
+                    "mode": "database_daily",
+                    "error": result.get("error")
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to publish daily entry to Notion: {e}")
+            return {
+                "published": [],
+                "count": 0,
+                "mode": "database_daily",
+                "error": str(e)
+            }
 
     async def publish(self, content: Dict) -> Dict[str, Any]:
         """Publish a single paper to Notion using MCP."""
@@ -164,10 +495,7 @@ class NotionPublisherAgent(BasePublisherAgent):
         content: str
     ) -> Dict[str, Any]:
         """
-        Call Notion MCP to create a page in the database.
-
-        In MCP-enabled runtime, this will call the actual Notion MCP tool.
-        In standalone mode, it returns prepared parameters.
+        Call Notion API to create a page in the database.
 
         Args:
             page_data: Dict with database_id and properties
@@ -176,8 +504,11 @@ class NotionPublisherAgent(BasePublisherAgent):
         Returns:
             Dict with publish result
         """
+        from notion_client import AsyncClient
+
         properties = page_data.get("properties", {})
         paper_id = page_data.get("paper_id", "unknown")
+        database_id = page_data.get("database_id", settings.NOTION_DATABASE_ID)
 
         # Build Notion API-compatible properties
         notion_properties = {}
@@ -228,27 +559,103 @@ class NotionPublisherAgent(BasePublisherAgent):
             except:
                 pass
 
-        logger.info(f"Prepared Notion page for {paper_id}")
+        logger.info(f"Publishing to Notion: {paper_id}")
 
-        # In MCP-enabled runtime, call the actual tool:
-        # result = await mcp__notion__notion-create-pages(
-        #     parent={"database_id": settings.NOTION_DATABASE_ID},
-        #     pages=[{
-        #         "properties": notion_properties,
-        #         "content": content
-        #     }]
-        # )
+        try:
+            # Use Notion API directly
+            async with AsyncClient(auth=settings.NOTION_API_KEY) as client:
+                # Create page with properties
+                response = await client.pages.create(
+                    parent={"database_id": database_id},
+                    properties=notion_properties
+                )
 
-        # For standalone execution, return prepared params
-        return {
-            "platform": "notion",
-            "paper_id": paper_id,
-            "status": "success",
-            "database_id": settings.NOTION_DATABASE_ID,
-            "properties": notion_properties,
-            "content_preview": content[:200] if content else "",
-            "url": f"https://notion.so/{paper_id}"
-        }
+                page_id = response.get("id", "")
+                page_url = response.get("url", "")
+                logger.info(f"Successfully created Notion page: {page_url}")
+
+                # Add content to the page body if provided
+                if content and page_id:
+                    await self._add_page_content(client, page_id, content)
+
+                return {
+                    "platform": "notion",
+                    "paper_id": paper_id,
+                    "status": "success",
+                    "url": page_url
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to publish to Notion: {e}")
+            return {
+                "platform": "notion",
+                "paper_id": paper_id,
+                "status": "failed",
+                "error": str(e)
+            }
+
+    async def _add_page_content(
+        self,
+        client,
+        page_id: str,
+        content: str
+    ) -> None:
+        """
+        Add markdown content to a Notion page body.
+
+        Converts markdown text to Notion blocks and appends them to the page.
+        Notion has a 2000 character limit per rich_text item, so long content
+        is split into multiple paragraph blocks.
+
+        Args:
+            client: Notion AsyncClient instance
+            page_id: The page ID to add content to
+            content: Markdown content string
+        """
+        # Split content into manageable chunks (Notion limit: 2000 chars per rich_text)
+        MAX_CHARS = 2000
+
+        # Simple approach: split by paragraphs/sections
+        lines = content.split('\n')
+        blocks = []
+        current_chunk = ""
+
+        for line in lines:
+            # If adding this line would exceed limit, flush current chunk
+            if len(current_chunk) + len(line) + 1 > MAX_CHARS and current_chunk:
+                blocks.append({
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [{"type": "text", "text": {"content": current_chunk}}]
+                    }
+                })
+                current_chunk = line + '\n'
+            else:
+                current_chunk += line + '\n'
+
+        # Add remaining content
+        if current_chunk.strip():
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": current_chunk}}]
+                }
+            })
+
+        # Add blocks in batches (Notion limit: 100 blocks per request)
+        BATCH_SIZE = 100
+        for i in range(0, len(blocks), BATCH_SIZE):
+            batch = blocks[i:i + BATCH_SIZE]
+            try:
+                await client.blocks.children.append(
+                    block_id=page_id,
+                    children=batch
+                )
+                logger.info(f"Added {len(batch)} content blocks to page {page_id}")
+            except Exception as e:
+                logger.warning(f"Failed to add some content blocks: {e}")
 
 
 @register_agent
@@ -296,10 +703,23 @@ class FeishuPublisherAgent(BasePublisherAgent):
                 paper = item.get("paper", {})
                 summary = item.get("summary", {})
 
+                # Show up to 6 authors, truncate with "等" if there are more
+                authors = paper.get("authors", [])
+                if isinstance(authors, str):
+                    import json
+                    try:
+                        authors = json.loads(authors)
+                    except:
+                        authors = [authors]
+                if len(authors) > 6:
+                    authors_display = authors[:6] + ["等"]
+                else:
+                    authors_display = authors
+
                 paper_data = {
                     "title": paper.get("title", ""),
                     "arxiv_id": paper.get("arxiv_id", ""),
-                    "authors": paper.get("authors", [])[:3],
+                    "authors": authors_display,
                     "summary": summary.get("summary", paper.get("abstract", ""))[:300],
                     "highlights": summary.get("highlights", [])[:3],
                     "tags": paper.get("tags", []),
@@ -378,7 +798,7 @@ class FeishuPublisherAgent(BasePublisherAgent):
         papers: list[Dict]
     ) -> Optional[Dict[str, Any]]:
         """
-        Generate collection-style card content for multiple papers.
+        Generate collection-style card content for multiple papers using Feishu skill.
 
         Args:
             papers: List of paper dictionaries
@@ -386,13 +806,20 @@ class FeishuPublisherAgent(BasePublisherAgent):
         Returns:
             Dict with card content or None
         """
-        from config.prompts import load_prompt
+        from config.prompts import load_skill_prompt
 
-        prompt = load_prompt("feishu_collection") if self._prompt_exists("feishu_collection") else None
-
-        if not prompt:
-            # Use default digest format
-            return None
+        # Load Feishu skill as system prompt (preferred) with fallback to legacy prompt
+        try:
+            prompt = load_skill_prompt("feishu-publisher")
+            logger.info("Using feishu-publisher skill for content generation")
+        except FileNotFoundError:
+            from config.prompts import load_prompt
+            if self._prompt_exists("feishu_collection"):
+                prompt = load_prompt("feishu_collection")
+                logger.info("Using legacy feishu_collection prompt")
+            else:
+                # Use default digest format
+                return None
 
         # Build paper info for prompt
         papers_info = []
@@ -453,9 +880,10 @@ class XHSPublisherAgent(BasePublisherAgent):
         Execute publishing flow in collection mode.
 
         合集模式：将所有论文整合成一条小红书笔记发布
+        使用拼接封面图：将多篇论文的PDF封面合并成一张精美封面
         """
         from tools.llm_client import get_llm_client
-        from tools.pdf_screenshot import batch_download_and_screenshot
+        from tools.pdf_screenshot import create_xhs_cover
 
         self.llm_client = get_llm_client()
 
@@ -479,31 +907,44 @@ class XHSPublisherAgent(BasePublisherAgent):
                 logger.error("Failed to generate collection content")
                 return {"published": [], "count": 0, "error": "Failed to generate content"}
 
-            # 3. Download PDFs and create screenshots
-            logger.info("Downloading PDFs and creating screenshots...")
-            cover_paths = await batch_download_and_screenshot(papers, max_concurrent=3)
+            # 3. Create merged cover image from PDF screenshots
+            logger.info("Creating merged cover image from PDF screenshots...")
+            cover_output_path = str(settings.STORAGE_DIR / "xhs_cover_merged.jpg")
 
-            # Filter out papers without covers
-            images = [cover_paths.get(p.get("arxiv_id")) for p in papers if cover_paths.get(p.get("arxiv_id"))]
+            # Generate a catchy title for the cover
+            cover_title = collection_content.get("title", "AI Agent 论文精选")
+            if len(cover_title) > 15:
+                cover_title = cover_title[:15] + "..."
 
-            if not images:
-                logger.warning("No cover images available, using fallback")
-                # Use fallback image from storage
+            merged_cover_path = await create_xhs_cover(
+                papers=papers,
+                output_path=cover_output_path,
+                title=cover_title,
+                layout="grid"  # Options: grid, horizontal, vertical, mosaic
+            )
+
+            # 4. Prepare images list
+            if merged_cover_path:
+                images = [merged_cover_path]
+                logger.info(f"Using merged cover image: {merged_cover_path}")
+            else:
+                # Fallback: use individual screenshots or fallback image
+                logger.warning("Failed to create merged cover, using fallback")
                 fallback_path = settings.STORAGE_DIR / "cover_fallback.jpg"
                 if fallback_path.exists():
                     images = [str(fallback_path)]
+                else:
+                    logger.error("No images available for XHS post")
+                    return {"published": [], "count": 0, "error": "No images"}
 
-            if not images:
-                logger.error("No images available for XHS post")
-                return {"published": [], "count": 0, "error": "No images"}
-
-            # 4. Publish to XHS
+            # 5. Publish to XHS
             result = await self._publish_to_xhs(collection_content, images)
 
             return {
                 "published": [result],
                 "count": 1 if result.get("status") == "success" else 0,
                 "content": collection_content,
+                "cover_type": "merged" if merged_cover_path else "fallback",
                 "images_count": len(images)
             }
 
@@ -539,7 +980,7 @@ class XHSPublisherAgent(BasePublisherAgent):
         summaries: list[Dict]
     ) -> Optional[Dict[str, Any]]:
         """
-        Generate collection-style content for multiple papers.
+        Generate collection-style content for multiple papers using XHS skill.
 
         Args:
             papers: List of paper dictionaries
@@ -548,9 +989,16 @@ class XHSPublisherAgent(BasePublisherAgent):
         Returns:
             Dict with title, content, and tags for XHS post
         """
-        from config.prompts import load_prompt
+        from config.prompts import load_skill_prompt
 
-        prompt = load_prompt("xhs_collection")
+        # Load XHS skill as system prompt (preferred) with fallback to legacy prompt
+        try:
+            prompt = load_skill_prompt("xhs-publisher")
+            logger.info("Using xhs-publisher skill for content generation")
+        except FileNotFoundError:
+            from config.prompts import load_prompt
+            prompt = load_prompt("xhs_collection")
+            logger.info("Using legacy xhs_collection prompt")
 
         # Build paper info for prompt
         papers_info = []
@@ -734,8 +1182,7 @@ class WeChatMPPublisherAgent(BasePublisherAgent):
         from tools.llm_client import get_llm_client
         from tools.wechat_publisher import (
             get_wechat_client,
-            create_cover_image,
-            format_article_content
+            create_cover_image
         )
 
         self.llm_client = get_llm_client()
@@ -761,7 +1208,11 @@ class WeChatMPPublisherAgent(BasePublisherAgent):
             title = f"AI Agent 论文精选 ({len(papers)}篇)"
             logger.info(f"Creating WeChat draft: {title}")
 
-            # 3. Create cover image
+            # 3. Generate article content using skill
+            logger.info("Generating article content using wechat-publisher skill...")
+            article_content = await self._generate_article_content(papers, summaries_data, title)
+
+            # 4. Create cover image
             logger.info("Creating cover image...")
             cover_data = create_cover_image(
                 title="AI Agent 论文推荐",
@@ -769,20 +1220,16 @@ class WeChatMPPublisherAgent(BasePublisherAgent):
                 output_path=str(settings.STORAGE_DIR / "wechat_cover.jpg")
             )
 
-            # 4. Upload cover image
+            # 5. Upload cover image
             logger.info("Uploading cover image to WeChat...")
             thumb_media_id = await wechat_client.upload_image(cover_data, "cover.jpg")
-
-            # 5. Format article content
-            logger.info("Formatting article content...")
-            html_content = format_article_content(papers, summaries_data, title)
 
             # 6. Create draft
             article = {
                 "title": title,
                 "author": "arxiv_daily",
-                "digest": f"每日精选 {len(papers)} 篇 AI Agent 领域高质量论文，助您紧跟前沿研究动态。",
-                "content": html_content,
+                "digest": article_content.get("digest", f"每日精选 {len(papers)} 篇 AI Agent 领域高质量论文，助您紧跟前沿研究动态。"),
+                "content": article_content.get("content", ""),
                 "thumb_media_id": thumb_media_id,
                 "content_source_url": "https://arxiv.org",
                 "need_open_comment": 0,
@@ -808,6 +1255,81 @@ class WeChatMPPublisherAgent(BasePublisherAgent):
         except Exception as e:
             logger.error(f"WeChat MP publishing failed: {e}")
             return {"published": [], "count": 0, "error": str(e)}
+
+    async def _generate_article_content(
+        self,
+        papers: list[Dict],
+        summaries: list[Dict],
+        title: str
+    ) -> Dict[str, Any]:
+        """
+        Generate article content using WeChat MP skill.
+
+        Args:
+            papers: List of paper dictionaries
+            summaries: List of summary dictionaries
+            title: Article title
+
+        Returns:
+            Dict with 'content' (HTML) and 'digest'
+        """
+        from config.prompts import load_skill_prompt
+        from tools.wechat_publisher import format_article_content
+
+        # Load WeChat skill as system prompt (preferred) with fallback to legacy format
+        try:
+            prompt = load_skill_prompt("wechat-publisher")
+            logger.info("Using wechat-publisher skill for content generation")
+        except FileNotFoundError:
+            logger.info("WeChat skill not found, using legacy format_article_content")
+            # Fallback to legacy formatting
+            html_content = format_article_content(papers, summaries, title)
+            return {
+                "content": html_content,
+                "digest": f"每日精选 {len(papers)} 篇 AI Agent 领域高质量论文，助您紧跟前沿研究动态。"
+            }
+
+        # Build paper info for prompt
+        papers_info = []
+        for paper, summary in zip(papers, summaries):
+            info = {
+                "title": paper.get("title", ""),
+                "arxiv_id": paper.get("arxiv_id", ""),
+                "authors": paper.get("authors", [])[:3],
+                "summary": summary.get("summary", "")[:500] if summary else paper.get("abstract", "")[:500],
+                "highlights": summary.get("highlights", [])[:3] if summary else []
+            }
+            papers_info.append(info)
+
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"""
+今日精选论文共 {len(papers)} 篇，文章标题：{title}
+
+{json.dumps(papers_info, ensure_ascii=False, indent=2)}
+
+请生成适合微信公众号的文章内容。输出JSON格式，包含:
+- title: 文章标题
+- digest: 摘要(100字以内)
+- content: HTML格式的正文内容
+"""}
+        ]
+
+        try:
+            result = await self.llm_client.generate_json(
+                messages=messages,
+                model=settings.MODEL_PUBLISHER,
+                temperature=0.7
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to generate WeChat content with skill: {e}")
+            # Fallback to legacy formatting
+            html_content = format_article_content(papers, summaries, title)
+            return {
+                "content": html_content,
+                "digest": f"每日精选 {len(papers)} 篇 AI Agent 领域高质量论文，助您紧跟前沿研究动态。"
+            }
 
     async def publish(self, content: Dict) -> Dict[str, Any]:
         """Publish a single paper to WeChat MP (legacy method)."""

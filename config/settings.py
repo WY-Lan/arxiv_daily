@@ -160,6 +160,10 @@ class Settings(BaseSettings):
     # Notion integration
     NOTION_API_KEY: str = Field(default="")
     NOTION_DATABASE_ID: str = Field(default="")
+    NOTION_PARENT_PAGE_ID: str = Field(
+        default="",
+        description="Parent page ID for daily pages (knowledge base mode)"
+    )
 
     # Feishu integration
     FEISHU_APP_ID: str = Field(default="")
