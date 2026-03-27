@@ -1,0 +1,18 @@
+📌 详细解读传送门：
+
+1. GCAgent群聊神器
+🔗 https://www.xiaohongshu.com/explore/69c641c10000000022026039
+
+2. 递归推理机RIMs
+🔗 https://www.xiaohongshu.com/explore/69c6420f0000000022000dc0
+
+3. SlideSparse GPU加速
+🔗 https://www.xiaohongshu.com/explore/69c642bf0000000022001200
+
+4. AI+数字孪生分拣
+🔗 https://www.xiaohongshu.com/explore/69c6430d000000001f005bd4
+
+5. AI硬件十年路线图
+🔗 https://www.xiaohongshu.com/explore/69c64347000000002103b762
+
+建议收藏合集，再逐个阅读详细解读~
