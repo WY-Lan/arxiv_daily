@@ -12,8 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from loguru import logger
 from tools.paper_analyzer import (
     PaperContentAnalyzer,
-    format_deep_analysis_for_xhs,
-    format_deep_analysis_for_feishu
+    format_deep_analysis_for_xhs
 )
 from tools.llm_client import BailianClient
 
@@ -124,15 +123,6 @@ async def test_deep_analysis(arxiv_id: str = "2401.15884"):
         print("-" * 60)
         xhs_output = format_deep_analysis_for_xhs(deep)
         print(xhs_output[:1500] + "..." if len(xhs_output) > 1500 else xhs_output)
-
-        # Test Feishu formatting
-        print("\n" + "-" * 60)
-        print("FEISHU CARD ELEMENTS")
-        print("-" * 60)
-        feishu_elements = format_deep_analysis_for_feishu(deep)
-        print(f"Generated {len(feishu_elements)} card elements")
-        for elem in feishu_elements[:5]:
-            print(f"  - {elem}")
 
         # Save full result to file
         output_file = Path(__file__).parent.parent / "storage" / f"deep_analysis_{arxiv_id.replace('.', '_')}.json"

@@ -44,7 +44,6 @@ async def run_review(send_only: bool = False, check_status: bool = False):
         send_only: Only send review request without starting server
         check_status: Check review status only
     """
-    from tools.feishu_webhook import get_feishu_client
     from web.app import create_review_session, get_review_url, run_server_async
     from storage.database import db
     import json
@@ -95,24 +94,10 @@ async def run_review(send_only: bool = False, check_status: bool = False):
 
         print(f"Created review session: {session_id}")
         print(f"Review URL: {review_url}")
-
-        # Send review card to Feishu
-        feishu_client = get_feishu_client()
-        if feishu_client:
-            result = await feishu_client.send_review_card(
-                papers=papers_data,
-                review_url=review_url,
-                expire_hours=settings.REVIEW_LINK_EXPIRE_HOURS
-            )
-            if result.get("success"):
-                print("Review card sent to Feishu successfully!")
-            else:
-                print(f"Failed to send review card: {result.get('error')}")
-        else:
-            print("Feishu webhook not configured. Skipping notification.")
+        print("\nNote: Review notification is now handled via WeChat MP.")
 
         if send_only:
-            print("Review request sent. Run 'python main.py review' to start the review server.")
+            print("Review request created. Run 'python main.py review' to start the review server.")
             return
 
         # Start review server
@@ -135,13 +120,13 @@ async def run_cli():
 
     parser.add_argument(
         "command",
-        choices=["run", "schedule", "fetch", "select", "publish", "config", "review"],
+        choices=["run", "schedule", "fetch", "select", "publish", "config", "review", "wechat"],
         help="Command to execute"
     )
 
     parser.add_argument(
         "--platform",
-        choices=["notion", "feishu", "xhs", "wechat", "all"],
+        choices=["notion", "xhs", "wechat", "all"],
         default="all",
         help="Platform to publish to"
     )
@@ -176,6 +161,20 @@ async def run_cli():
         "--status",
         action="store_true",
         help="Check review status"
+    )
+
+    # WeChat command options
+    parser.add_argument(
+        "--mode",
+        choices=["single", "collection", "nplus1"],
+        default="nplus1",
+        help="WeChat publishing mode: single, collection, or nplus1 (default)"
+    )
+
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish drafts immediately (WeChat only)"
     )
 
     args = parser.parse_args()
@@ -235,6 +234,48 @@ async def run_cli():
             # Only publish
             print("Publish command - requires fetched and selected papers first")
 
+        elif args.command == "wechat":
+            # WeChat publishing
+            if not settings.WECHAT_APP_ID or not settings.WECHAT_APP_SECRET:
+                print("❌ WeChat MP not configured. Set WECHAT_APP_ID and WECHAT_APP_SECRET.")
+                return
+
+            if args.mode == "nplus1":
+                # n+1 mode: n detailed posts + 1 summary
+                from tools.publish_wechat_nplus1 import main as wechat_nplus1_main
+                await wechat_nplus1_main()
+            elif args.mode == "collection":
+                # Collection mode: single summary post
+                from agents.publishers import WeChatMPPublisherAgent
+                from agents.base import AgentContext
+                import json
+
+                # Load selected papers
+                papers_path = Path('storage/selected_papers.json')
+                if not papers_path.exists():
+                    print("❌ No selected papers found. Run selection first.")
+                    return
+
+                with open(papers_path, 'r') as f:
+                    papers = json.load(f)
+
+                # Create context with papers
+                summaries = [{"paper": p, "summary": {}} for p in papers]
+                context = AgentContext(
+                    session_id=f"wechat_{asyncio.get_event_loop().time()}",
+                    timestamp=asyncio.get_event_loop().time()
+                )
+                context.set("summaries", summaries)
+
+                # Run publisher
+                agent = WeChatMPPublisherAgent()
+                result = await agent.run(context)
+                print(f"Published: {result.get('count', 0)} articles")
+
+            elif args.mode == "single":
+                # Single paper mode (requires --count for which paper)
+                print("Single paper mode - use nplus1 mode for full publishing")
+
         elif args.command == "config":
             # Show configuration
             print("=" * 50)
@@ -249,7 +290,6 @@ async def run_cli():
             print("=" * 50)
             print("\nPlatform Configuration:")
             print(f"  Notion: {'Configured' if settings.NOTION_API_KEY else 'Not configured'}")
-            print(f"  Feishu: {'Configured' if settings.FEISHU_APP_ID else 'Not configured'}")
             print(f"  XHS: {'Configured' if settings.XHS_API_KEY else 'Not configured'}")
             print(f"  WeChat: {'Configured' if settings.WECHAT_APP_ID else 'Not configured'}")
             print("=" * 50)

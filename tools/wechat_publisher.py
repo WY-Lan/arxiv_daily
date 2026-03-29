@@ -196,6 +196,82 @@ class WeChatMPClient:
         else:
             raise ValueError(f"Failed to publish: {result}")
 
+    async def get_draft_list(self, offset: int = 0, count: int = 10) -> List[Dict]:
+        """
+        Get list of drafts.
+
+        Args:
+            offset: Offset for pagination
+            count: Number of drafts to retrieve (max 20)
+
+        Returns:
+            List of draft dicts
+        """
+        token = await self.get_access_token()
+        url = "https://api.weixin.qq.com/cgi-bin/draft/getdraft"
+        params = {"access_token": token}
+
+        data = {"offset": offset, "count": min(count, 20)}
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, params=params, json=data)
+            result = response.json()
+
+        if "item" in result:
+            return result["item"]
+        else:
+            logger.warning(f"Failed to get draft list: {result}")
+            return []
+
+    async def delete_draft(self, media_id: str) -> bool:
+        """
+        Delete a draft.
+
+        Args:
+            media_id: Draft media ID
+
+        Returns:
+            True if successful
+        """
+        token = await self.get_access_token()
+        url = "https://api.weixin.qq.com/cgi-bin/draft/delete"
+        params = {"access_token": token}
+
+        data = {"media_id": media_id}
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, params=params, json=data)
+            result = response.json()
+
+        if result.get("errcode") == 0:
+            logger.info(f"Draft deleted: {media_id}")
+            return True
+        else:
+            logger.error(f"Failed to delete draft: {result}")
+            return False
+
+    async def get_publish_status(self, publish_id: str) -> Dict:
+        """
+        Get status of a publish task.
+
+        Args:
+            publish_id: Publish ID from publish_draft()
+
+        Returns:
+            Status dict with publish_status and article details
+        """
+        token = await self.get_access_token()
+        url = "https://api.weixin.qq.com/cgi-bin/freepublish/get"
+        params = {"access_token": token}
+
+        data = {"publish_id": publish_id}
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, params=params, json=data)
+            result = response.json()
+
+        return result
+
 
 def create_cover_image(
     title: str,

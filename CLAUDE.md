@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Arxiv Daily Push is a multi-agent system for daily AI Agent paper recommendations. It fetches papers from arxiv, evaluates them using a 4-dimensional scoring system, and publishes curated content to multiple platforms (Notion, Feishu, Xiaohongshu, WeChat Official Account).
+Arxiv Daily Push is a multi-agent system for daily AI Agent paper recommendations. It fetches papers from arxiv, evaluates them using a 4-dimensional scoring system, and publishes curated content to multiple platforms (Notion, Xiaohongshu, WeChat Official Account).
 
 ## Key Commands
 
@@ -31,14 +31,30 @@ pip install -r requirements.txt
 ### Platform-specific Testing
 
 ```bash
-# Test Feishu webhook
-python tools/test_feishu.py --webhook <webhook_url>
-
 # Test Notion publishing
 python tools/test_notion.py
 
 # Test WeChat publishing
-python tools/test_wechat_final.py
+python tools/test_wechat_nplus1.py --mode all
+
+# Test WeChat n+1 mode (dry run)
+python tools/test_wechat_nplus1.py --mode nplus1
+
+# Test WeChat n+1 mode (actual)
+python tools/test_wechat_nplus1.py --mode nplus1 --no-dry-run
+```
+
+### WeChat Publishing Commands
+
+```bash
+# n+1 mode: n detailed posts + 1 summary (recommended)
+python main.py wechat --mode nplus1
+
+# Collection mode: single summary post
+python main.py wechat --mode collection
+
+# Check WeChat API connection
+python tools/test_wechat_nplus1.py --mode connection
 ```
 
 ## Architecture
@@ -65,11 +81,10 @@ Each publisher handles a specific platform:
 | Agent | Platform | Implementation Status |
 |-------|----------|----------------------|
 | `NotionPublisherAgent` | Notion | Uses Notion MCP |
-| `FeishuPublisherAgent` | Feishu | Webhook-based (`tools/feishu_webhook.py`) |
 | `XHSPublisherAgent` | Xiaohongshu | Uses xiaohongshu-mcp, creates collection posts |
-| `WeChatMPPublisherAgent` | WeChat MP | Draft creation via API |
+| `WeChatMPPublisherAgent` | WeChat MP | n+1 mode with PDF cover screenshots |
 
-Publishers use **collection mode** - aggregating all papers into one post rather than publishing individually.
+**WeChat n+1 Mode**: Creates n detailed articles (one per paper) + 1 summary article. The number n is dynamic, determined by selection results. Cover images use arxiv PDF screenshots.
 
 ### LLM Integration
 
@@ -92,7 +107,7 @@ Publishers use **collection mode** - aggregating all papers into one post rather
 - `config/settings.py`: Pydantic settings loaded from `.env`
 - `config/prompts/`: Platform-specific prompt templates
   - `selection.txt`, `summary.txt` - Core prompts
-  - `xhs_collection.txt`, `feishu_collection.txt` - Platform-specific formats
+  - `xhs_collection.txt`, `wechat_single_paper.txt` - Platform-specific formats
 
 ### Database
 
@@ -106,7 +121,6 @@ Publishers use **collection mode** - aggregating all papers into one post rather
 - Database operations go through the global `db` instance from `storage/database.py`
 - Prompt templates are loaded via `from config.prompts import load_prompt`
 - LLM calls use `llm_client.generate_json()` for structured output
-- Feishu cards use `"tag": "hr"` for dividers (not `"divider"`)
 
 ## MCP/Skills Extension
 
@@ -136,13 +150,13 @@ await db.save_skill({
 Required environment variables (see `.env.example`):
 
 - `BAILIAN_API_KEY` - Required for LLM operations
-- `FEISHU_WEBHOOK_URL` - For Feishu publishing
 - `NOTION_API_KEY`, `NOTION_DATABASE_ID` - For Notion publishing
 - `WECHAT_APP_ID`, `WECHAT_APP_SECRET` - For WeChat MP
 
 ## PDF Cover Generation
 
-XHS posts use PDF screenshots as cover images:
+XHS and WeChat posts use PDF screenshots as cover images:
 - `tools/pdf_screenshot.py` - Downloads PDFs and captures first page
 - Uses `batch_download_and_screenshot()` for parallel processing
 - Falls back to `storage/cover_fallback.jpg` if PDF unavailable
+- WeChat cover dimensions: 900x500 pixels

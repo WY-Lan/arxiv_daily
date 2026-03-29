@@ -165,11 +165,6 @@ class Settings(BaseSettings):
         description="Parent page ID for daily pages (knowledge base mode)"
     )
 
-    # Feishu integration
-    FEISHU_APP_ID: str = Field(default="")
-    FEISHU_APP_SECRET: str = Field(default="")
-    FEISHU_WEBHOOK_URL: str = Field(default="")
-
     # Xiaohongshu (third-party service)
     XHS_API_KEY: str = Field(default="")
     XHS_API_URL: str = Field(default="")

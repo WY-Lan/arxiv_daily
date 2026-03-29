@@ -66,7 +66,7 @@ class PublishRecord(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, nullable=False, index=True)
-    platform = Column(String(50), nullable=False)  # notion, feishu, xhs, wechat
+    platform = Column(String(50), nullable=False)  # notion, xhs, wechat
     status = Column(String(20), default="pending")  # pending, success, failed
     published_at = Column(DateTime)
     platform_url = Column(String(500))  # URL of published content
