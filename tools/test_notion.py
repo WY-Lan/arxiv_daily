@@ -164,6 +164,7 @@ async def prepare_notion_page():
         publish_paper_to_notion,
         format_notion_content,
         prepare_daily_page,
+        prepare_daily_database_entry,
         format_daily_page_content
     )
 
@@ -200,17 +201,25 @@ async def prepare_notion_page():
 
     elif settings.NOTION_DATABASE_ID:
         print("\n" + "=" * 60)
-        print("Preparing Database Entry (Legacy Mode)")
+        print("Preparing Database Daily Entry (Hybrid Mode)")
         print("=" * 60)
+        print("📌 Mode: One database entry per day with all papers in page body")
 
-        # Prepare page data
-        page_data = publish_paper_to_notion(
-            paper=paper,
-            summary=summary,
+        # Fix authors format
+        paper["authors"] = json.loads(paper["authors"]) if isinstance(paper["authors"], str) else paper["authors"]
+
+        # Prepare daily database entry (hybrid mode)
+        page_data = prepare_daily_database_entry(
+            papers=[paper],
+            summaries=[summary],
             database_id=settings.NOTION_DATABASE_ID
         )
 
-        print("\n📄 Properties:")
+        print(f"\n📄 Title: {page_data['title']}")
+        print(f"   Database ID: {page_data['database_id']}")
+        print(f"   Paper Count: {page_data['paper_count']}")
+
+        print("\n📋 Database Properties:")
         print("-" * 40)
         for key, value in page_data["properties"].items():
             if isinstance(value, str) and len(value) > 60:
@@ -218,13 +227,14 @@ async def prepare_notion_page():
             else:
                 print(f"  {key}: {value}")
 
-        # Format content
-        content = format_notion_content(paper, summary)
-        print("\n📝 Page Content:")
+        # Show page content
+        content = page_data['content']
+        print("\n📝 Page Content Preview:")
         print("-" * 40)
-        print(content[:500] + "..." if len(content) > 500 else content)
+        print(content[:800] + "..." if len(content) > 800 else content)
 
-        print("\n✅ Database entry data prepared successfully!")
+        print("\n✅ Database daily entry data prepared successfully!")
+        print("   This will create ONE database row with all papers in the page body.")
         return page_data
 
     else:
@@ -302,6 +312,181 @@ async def test_mcp_connection():
         return False
 
 
+async def test_notion_database():
+    """
+    Test Notion database operations (save, query, update).
+
+    Tests the storage/notion_db.py module.
+    """
+    print("\n" + "=" * 60)
+    print("Testing Notion Database Operations")
+    print("=" * 60)
+
+    from storage.notion_db import NotionDatabase
+
+    # Check configuration
+    if not settings.NOTION_API_KEY:
+        print("❌ NOTION_API_KEY not configured")
+        return False
+
+    if not settings.NOTION_PAPERS_DATABASE_ID:
+        print("❌ NOTION_PAPERS_DATABASE_ID not configured")
+        print("   Create a Notion database with the following properties:")
+        print("   - 论文标题 (Title)")
+        print("   - arxiv_id (Text)")
+        print("   - 作者 (Multi-select)")
+        print("   - 摘要 (Text)")
+        print("   - 发布日期 (Date)")
+        print("   - arxiv链接 (URL)")
+        print("   - PDF链接 (URL)")
+        print("   - 引用数 (Number)")
+        print("   - 总评分 (Number)")
+        print("   - 选择状态 (Select: pending/selected/rejected)")
+        print("   - 处理状态 (Checkbox)")
+        return False
+
+    # Initialize database
+    db = NotionDatabase()
+    success = await db.init()
+
+    if not success or not db.is_enabled():
+        print("❌ Failed to initialize Notion database")
+        return False
+
+    print("✅ Notion database initialized")
+
+    # Test data
+    test_paper = {
+        "arxiv_id": "test.12345",
+        "title": "Test Paper for Notion Storage",
+        "authors": '["Test Author 1", "Test Author 2"]',
+        "abstract": "This is a test paper to verify Notion database integration.",
+        "published_date": "2026-03-31",
+        "abs_url": "https://arxiv.org/abs/test.12345",
+        "pdf_url": "https://arxiv.org/pdf/test.12345.pdf",
+        "citation_count": 10,
+        "total_score": 0.85,
+        "is_selected": False,
+        "is_processed": False,
+    }
+
+    try:
+        # Test save
+        print("\n📝 Testing save_paper...")
+        page_id = await db.save_paper(test_paper)
+
+        if page_id:
+            print(f"✅ Paper saved successfully: {page_id}")
+        else:
+            print("❌ Failed to save paper")
+            return False
+
+        # Test query
+        print("\n🔍 Testing get_paper_by_arxiv_id...")
+        paper = await db.get_paper_by_arxiv_id("test.12345")
+
+        if paper:
+            print(f"✅ Paper found: {paper.get('title')}")
+        else:
+            print("❌ Paper not found")
+            return False
+
+        # Test update
+        print("\n✏️ Testing update_paper...")
+        success = await db.update_paper("test.12345", {
+            "total_score": 0.90,
+            "is_selected": True
+        })
+
+        if success:
+            print("✅ Paper updated successfully")
+        else:
+            print("⚠️ Paper update failed (non-critical)")
+
+        # Test get_selected_papers
+        print("\n📋 Testing get_selected_papers...")
+        selected = await db.get_selected_papers(limit=5)
+        print(f"✅ Found {len(selected)} selected papers")
+
+        # Cleanup: Delete test paper (manual in Notion)
+        print(f"\n⚠️ Note: Test paper created with page_id: {page_id}")
+        print("   Please delete it manually in Notion or update its status.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Test failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        await db.close()
+
+
+async def test_hybrid_storage():
+    """
+    Test hybrid storage (Notion + local SQLite).
+
+    Tests the storage/hybrid_storage.py module.
+    """
+    print("\n" + "=" * 60)
+    print("Testing Hybrid Storage")
+    print("=" * 60)
+
+    from storage.hybrid_storage import HybridStorage
+
+    # Initialize storage
+    storage = HybridStorage(use_notion=True)
+    await storage.init()
+
+    print(f"Notion enabled: {storage.is_notion_enabled()}")
+
+    # Test data
+    test_paper = {
+        "arxiv_id": "hybrid.test.123",
+        "title": "Test Paper for Hybrid Storage",
+        "authors": '["Hybrid Test Author"]',
+        "abstract": "Testing the hybrid storage system.",
+        "published_date": "2026-03-31",
+        "abs_url": "https://arxiv.org/abs/hybrid.test.123",
+        "pdf_url": "https://arxiv.org/pdf/hybrid.test.123.pdf",
+        "citation_count": 5,
+        "total_score": 0.75,
+    }
+
+    try:
+        # Test save
+        print("\n📝 Testing save_paper (dual write)...")
+        result = await storage.save_paper(test_paper)
+        print(f"   Local: {'✅' if result.get('local') else '❌'}")
+        print(f"   Remote: {'✅' if result.get('remote') else '❌ (Notion not configured or failed)'}")
+
+        # Test query
+        print("\n🔍 Testing get_paper_by_arxiv_id...")
+        paper = await storage.get_paper_by_arxiv_id("hybrid.test.123")
+        if paper:
+            print(f"✅ Paper retrieved: {paper.get('title')}")
+        else:
+            print("❌ Paper not found")
+
+        # Test get_unprocessed_papers
+        print("\n📋 Testing get_unprocessed_papers...")
+        papers = await storage.get_unprocessed_papers(limit=10)
+        print(f"✅ Found {len(papers)} unprocessed papers")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        await storage.close()
+
+
 async def main():
     """Main entry point."""
     import argparse
@@ -311,8 +496,8 @@ async def main():
         "command",
         nargs="?",
         default="test",
-        choices=["test", "sample", "prepare", "agent", "mcp"],
-        help="Command to run: test (config), sample (data), prepare (page), agent (test), mcp (connection)"
+        choices=["test", "sample", "prepare", "agent", "mcp", "db", "storage"],
+        help="Command to run: test (config), sample (data), prepare (page), agent (test), mcp (connection), db (database ops), storage (hybrid)"
     )
 
     args = parser.parse_args()
@@ -327,6 +512,10 @@ async def main():
         await test_agent_publish()
     elif args.command == "mcp":
         await test_mcp_connection()
+    elif args.command == "db":
+        await test_notion_database()
+    elif args.command == "storage":
+        await test_hybrid_storage()
 
 
 if __name__ == "__main__":

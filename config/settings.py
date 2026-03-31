@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     # arXiv API settings
     ARXIV_BATCH_SIZE: int = Field(default=100, description="Number of papers to fetch per batch")
     ARXIV_DELAY_SECONDS: float = Field(default=3.0, description="Delay between arxiv API calls")
+    ARXIV_USE_WEB_SCRAPING: bool = Field(
+        default=True,
+        description="Use web scraping instead of API (recommended when API is rate limited)"
+    )
+    ARXIV_USE_NEW_PAGE: bool = Field(
+        default=True,
+        description="Use /new page (today's papers) instead of /recent (recent days)"
+    )
 
     # Paper selection settings
     DAILY_PAPER_COUNT: int = Field(default=5, description="Number of papers to select daily")
@@ -163,6 +171,20 @@ class Settings(BaseSettings):
     NOTION_PARENT_PAGE_ID: str = Field(
         default="",
         description="Parent page ID for daily pages (knowledge base mode)"
+    )
+
+    # Notion云端存储配置
+    NOTION_PAPERS_DATABASE_ID: str = Field(
+        default="",
+        description="Notion论文数据库ID (云端存储)"
+    )
+    NOTION_RECORDS_DATABASE_ID: str = Field(
+        default="",
+        description="Notion发布记录数据库ID (云端存储)"
+    )
+    USE_NOTION_STORAGE: bool = Field(
+        default=True,
+        description="启用Notion云端存储 (优先于本地SQLite)"
     )
 
     # Xiaohongshu (third-party service)

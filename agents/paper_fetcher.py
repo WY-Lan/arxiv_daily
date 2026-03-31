@@ -13,7 +13,9 @@ from tools.arxiv_api import ArxivClient, ArxivPaper
 from tools.semantic_scholar import SemanticScholarClient
 from tools.openalex import OpenAlexClient
 from tools.papers_with_code import PapersWithCodeClient
-from storage.database import db, Paper
+from storage.hybrid_storage import storage
+from storage.database import Paper
+from config.settings import settings
 
 
 @register_agent
@@ -33,7 +35,11 @@ class PaperFetcherAgent(BaseAgent):
 
     def __init__(self, config: AgentConfig = None):
         super().__init__(config)
-        self.arxiv_client = ArxivClient()
+        # 使用配置决定是否启用网页抓取模式
+        self.arxiv_client = ArxivClient(
+            use_web_scraping=settings.ARXIV_USE_WEB_SCRAPING,
+            use_new_page=settings.ARXIV_USE_NEW_PAGE
+        )
         self.s2_client = SemanticScholarClient()
         self.openalex_client = OpenAlexClient()
         self.pwc_client = PapersWithCodeClient()
@@ -150,8 +156,9 @@ class PaperFetcherAgent(BaseAgent):
         saved = 0
         for paper_data in papers:
             try:
-                await db.save_paper(paper_data)
-                saved += 1
+                result = await storage.save_paper(paper_data)
+                if result.get("local") or result.get("remote"):
+                    saved += 1
             except Exception as e:
                 logger.warning(f"保存论文 {paper_data['arxiv_id']} 失败: {e}")
 
@@ -313,18 +320,18 @@ class SelectionAgent(BaseAgent):
             existing_ids = {p["arxiv_id"] for p in papers}
             for hot_id in hot_paper_ids:
                 if hot_id not in existing_ids:
-                    # 尝试从数据库获取，或标记为待获取
-                    hot_paper = await db.get_paper_by_arxiv_id(hot_id)
+                    # 尝试从存储获取，或标记为待获取
+                    hot_paper = await storage.get_paper_by_arxiv_id(hot_id)
                     if hot_paper:
                         papers.append({
-                            "arxiv_id": hot_paper.arxiv_id,
-                            "title": hot_paper.title,
-                            "authors": hot_paper.authors,
-                            "abstract": hot_paper.abstract,
-                            "published_date": hot_paper.published_date,
-                            "citation_count": hot_paper.citation_count,
-                            "influence_score": hot_paper.influence_score,
-                            "community_score": hot_paper.community_score,
+                            "arxiv_id": hot_paper.get("arxiv_id"),
+                            "title": hot_paper.get("title"),
+                            "authors": hot_paper.get("authors"),
+                            "abstract": hot_paper.get("abstract"),
+                            "published_date": hot_paper.get("published_date"),
+                            "citation_count": hot_paper.get("citation_count", 0),
+                            "influence_score": hot_paper.get("influence_score", 0),
+                            "community_score": hot_paper.get("community_score", 0),
                             "is_hot_on_social": True,
                         })
                         logger.info(f"添加社交媒体热点论文: {hot_id}")
@@ -359,9 +366,9 @@ class SelectionAgent(BaseAgent):
         # 选出 Top N
         selected = self._select_top_papers(scored_papers, settings.DAILY_PAPER_COUNT)
 
-        # 更新数据库
+        # 更新存储
         selected_ids = [p["arxiv_id"] for p in selected]
-        await db.mark_papers_selected(selected_ids)
+        await storage.mark_papers_selected(selected_ids)
 
         # 更新上下文
         context.set("selected_papers", selected)
@@ -635,47 +642,15 @@ class SelectionAgent(BaseAgent):
 
     async def _get_unprocessed_papers(self, limit: int = 100) -> List[Dict]:
         """获取未处理的论文"""
-        papers = []
-        async with db.async_session() as session:
-            from sqlalchemy import select
-            stmt = select(Paper).where(
-                Paper.is_processed == False
-            ).order_by(Paper.created_at.desc()).limit(limit)
-            result = await session.execute(stmt)
-            rows = result.scalars().all()
-
-            for paper in rows:
-                papers.append({
-                    "arxiv_id": paper.arxiv_id,
-                    "title": paper.title,
-                    "authors": paper.authors,
-                    "abstract": paper.abstract,
-                    "published_date": paper.published_date,
-                    "citation_count": paper.citation_count,
-                    "influence_score": paper.influence_score,
-                    "community_score": paper.community_score,
-                    "total_score": paper.total_score,
-                })
-
-        return papers
+        return await storage.get_unprocessed_papers(limit)
 
     async def _get_papers_by_ids(self, arxiv_ids: List[str]) -> List[Dict]:
         """根据 ID 获取论文"""
         papers = []
         for aid in arxiv_ids:
-            paper = await db.get_paper_by_arxiv_id(aid)
+            paper = await storage.get_paper_by_arxiv_id(aid)
             if paper:
-                # Convert to dict
-                papers.append({
-                    "arxiv_id": paper.arxiv_id,
-                    "title": paper.title,
-                    "authors": paper.authors,
-                    "abstract": paper.abstract,
-                    "published_date": paper.published_date,
-                    "citation_count": paper.citation_count,
-                    "influence_score": paper.influence_score,
-                    "community_score": paper.community_score,
-                })
+                papers.append(paper)
         return papers
 
     def _normalize_citation(self, citation_count: int, max_citations: int = 100) -> float:

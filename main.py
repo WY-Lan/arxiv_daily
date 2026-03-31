@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from loguru import logger
 from scheduler.jobs import DailyPushScheduler, main_async
+from storage.hybrid_storage import storage
 from storage.database import db
 from config.settings import settings
 
@@ -179,8 +180,8 @@ async def run_cli():
 
     args = parser.parse_args()
 
-    # Initialize database
-    await db.init()
+    # Initialize storage (Notion + local)
+    await storage.init()
 
     try:
         if args.command == "run":
@@ -300,7 +301,7 @@ async def run_cli():
             print(f"  Link Expiry: {settings.REVIEW_LINK_EXPIRE_HOURS} hours")
 
     finally:
-        await db.close()
+        await storage.close()
 
 
 def print_results(results: dict):
