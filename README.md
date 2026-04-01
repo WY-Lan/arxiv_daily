@@ -51,6 +51,20 @@ python main.py fetch
 python main.py config
 ```
 
+### 4. 单篇论文发布
+
+支持将指定的单篇论文发布到小红书平台：
+
+```bash
+# 发布单篇论文到小红书（指定 arxiv_id）
+python main.py xhs --arxiv-id 2603.28052
+
+# 批量发布（5+1模式：5篇详细 + 1篇汇总）
+python main.py xhs
+```
+
+论文获取优先级：本地数据库 → selected_papers.json → arxiv API
+
 ## 📁 项目结构
 
 ```
@@ -187,6 +201,7 @@ await db.save_skill({
 - [x] 飞书 API 集成 (Webhook)
 - [x] 小红书 MCP 集成
 - [x] 微信公众号 API
+- [x] 单篇论文发布（指定 arxiv_id）
 - [ ] 审核流程 UI
 
 ## 📄 License

@@ -2,15 +2,22 @@
 Publish 5+1 posts to Xiaohongshu:
 - 5 detailed posts (one per paper with in-depth analysis)
 - 1 summary post with links to the 5 detailed posts
+
+Now supports multi-image posts with key figures extracted from PDF.
 """
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from loguru import logger
 from tools.llm_client import BailianClient
 from tools.pdf_screenshot import download_and_screenshot
+from tools.pdf_image_extractor import (
+    PDFImageExtractor,
+    ImageSelector,
+    extract_key_images_for_paper
+)
 from config.prompts import load_prompt
 
 
@@ -18,31 +25,41 @@ async def generate_single_paper_content(
     paper: dict,
     llm_client: BailianClient
 ) -> dict:
-    """Generate detailed XHS content for a single paper."""
-    # Load prompt template
-    prompt_template = load_prompt("xhs_single_paper")
+    """Generate detailed XHS content for a single paper using skill guidelines."""
+    from config.prompts import load_skill_prompt
 
-    # Prepare paper info
+    # Load XHS publisher skill prompt (includes SKILL.md + examples)
+    skill_prompt = load_skill_prompt("xhs-publisher")
+
+    # Prepare paper info with abstract for unit extraction
     authors = json.loads(paper['authors']) if isinstance(paper['authors'], str) else paper['authors']
 
     paper_info = {
         "title": paper['title'],
         "arxiv_id": paper['arxiv_id'],
-        "authors": authors[:3] if authors else [],
+        "authors": authors[:5] if authors else [],  # More authors for unit extraction
         "abstract": paper.get('abstract', ''),
     }
 
-    # Create full prompt
-    prompt = f"""{prompt_template}
+    # Create full prompt using skill guidelines
+    prompt = f"""{skill_prompt}
+
+## 当前任务
+
+请根据以下论文信息，按照上述单篇发布模式的规范生成小红书深度解读笔记。
+
+**注意**：
+1. 标题必须包含单位信息（从摘要/作者中提取），格式：单位 + "推出" + 「核心概念」产品名 + emoji
+2. 正文段落式写作，空行分隔，学术化风格
+3. 结尾格式：paper：论文标题
+4. 不需要互动引导
 
 ## 论文数据
-
-请根据以下论文信息生成小红书深度解读笔记：
 
 {json.dumps(paper_info, ensure_ascii=False, indent=2)}
 """
 
-    logger.info(f"Generating single-paper content for {paper['arxiv_id']}...")
+    logger.info(f"Generating single-paper content for {paper['arxiv_id']} using skill...")
     messages = [{"role": "user", "content": prompt}]
     result = await llm_client.generate_json(messages)
 
@@ -55,8 +72,15 @@ async def generate_summary_content(
     published_posts: list[dict]
 ) -> dict:
     """Generate summary XHS content with links to detailed posts."""
+    from datetime import datetime
+
     # Load prompt template
     prompt_template = load_prompt("xhs_collection")
+
+    # Get current date
+    today = datetime.now()
+    date_str = today.strftime("%Y年%m月%d日")
+    year_str = str(today.year)
 
     # Prepare papers info with links
     papers_info = []
@@ -81,7 +105,9 @@ async def generate_summary_content(
 
 {json.dumps(papers_info, ensure_ascii=False, indent=2)}
 
-注意：在正文中，每篇论文简介后添加"👉 详解见评论区置顶"，引导读者查看详细解读。
+注意：
+1. 标题使用"今日"开头，如"今日5篇AI Agent论文精选"，不要带年份
+2. 每篇论文简介后添加"👉 详解见评论区置顶"，引导读者查看详细解读
 """
 
     logger.info("Generating summary content...")
@@ -92,7 +118,7 @@ async def generate_summary_content(
 
 
 async def create_single_paper_cover(paper: dict, output_dir: Path) -> Optional[str]:
-    """Create cover image for a single paper."""
+    """Create cover image for a single paper (PDF first page screenshot)."""
     logger.info(f"Creating cover for {paper['arxiv_id']}...")
 
     try:
@@ -108,32 +134,137 @@ async def create_single_paper_cover(paper: dict, output_dir: Path) -> Optional[s
         return None
 
 
+async def create_single_paper_images(
+    paper: dict,
+    output_dir: Path,
+    max_pages: int = 18
+) -> List[str]:
+    """
+    Extract all PDF pages as images for XHS multi-image post.
+
+    XHS supports up to 18 images per post. This function extracts all pages
+    from the PDF (up to max_pages) to create a multi-image post.
+
+    Args:
+        paper: Paper dict with arxiv_id and pdf_url
+        output_dir: Directory to save images
+        max_pages: Maximum number of pages to extract (default 18, XHS limit)
+
+    Returns:
+        List of image paths (page_1, page_2, ..., page_n)
+    """
+    images = []
+
+    try:
+        logger.info(f"Extracting all pages from PDF for {paper['arxiv_id']}...")
+
+        # Extract all PDF pages as images (prefer_full_pages=True)
+        page_paths = await extract_key_images_for_paper(
+            arxiv_id=paper['arxiv_id'],
+            pdf_url=paper.get('pdf_url'),
+            max_images=max_pages,
+            output_dir=output_dir,
+            prefer_full_pages=True  # Extract all pages, not just key images
+        )
+
+        if page_paths:
+            images = page_paths
+            logger.info(f"Extracted {len(images)} pages for {paper['arxiv_id']}")
+        else:
+            logger.warning(f"No pages extracted for {paper['arxiv_id']}")
+            # Fallback to cover image
+            cover_path = await create_single_paper_cover(paper, output_dir)
+            if cover_path:
+                images.append(cover_path)
+
+    except Exception as e:
+        logger.error(f"Failed to extract pages for {paper['arxiv_id']}: {e}")
+        # Fallback to cover image
+        cover_path = await create_single_paper_cover(paper, output_dir)
+        if cover_path:
+            images.append(cover_path)
+
+    logger.info(f"Final images for {paper['arxiv_id']}: {len(images)} pages")
+    return images
+
+
 async def publish_single_post(
     title: str,
     content: str,
     tags: list,
-    cover_image: str
+    images: list  # Changed from single cover_image to list of images
 ) -> Optional[dict]:
-    """Publish a single post to XHS using MCP."""
+    """
+    Publish a single post to XHS using MCP.
+
+    Args:
+        title: Post title (max 20 chars)
+        content: Post content
+        tags: List of tags (without # prefix)
+        images: List of image paths (1-18 images)
+
+    Returns:
+        Publish result dict with url, feed_id, xsec_token
+    """
+    from mcp.client.session import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
     logger.info(f"Publishing: {title}")
+    logger.info(f"Images: {len(images)}")
 
     # Clean tags - remove # prefix if present
     clean_tags = [t.lstrip('#') for t in tags]
 
     try:
-        # Use MCP tool to publish
-        from mcp import use_mcp_tool
-        result = await use_mcp_tool(
-            server_name="xiaohongshu-mcp",
-            tool_name="publish_content",
-            arguments={
-                "title": title[:20],  # XHS title limit
-                "content": content,
-                "images": [cover_image],
-                "tags": clean_tags
-            }
-        )
-        return result
+        # Use MCP client to publish directly to xiaohongshu-mcp server
+        async with streamablehttp_client("http://localhost:18060/mcp") as (read, write, session_id):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+
+                result = await session.call_tool("publish_content", {
+                    "title": title[:20],  # XHS title limit
+                    "content": content,
+                    "images": images,
+                    "tags": clean_tags,
+                    "is_original": False
+                })
+
+                # Parse result
+                if result and hasattr(result, 'content'):
+                    for c in result.content:
+                        if c.type == 'text':
+                            text = c.text
+                            # Check for success message
+                            if "发布成功" in text or "发布完成" in text:
+                                logger.info(f"Publish success detected: {text[:100]}")
+                                # Try to extract URL if present
+                                url = ""
+                                if "http" in text:
+                                    # Extract URL from text
+                                    import re
+                                    url_match = re.search(r'https?://[^\s]+', text)
+                                    if url_match:
+                                        url = url_match.group(0)
+                                return {
+                                    "url": url,
+                                    "feed_id": "",
+                                    "xsec_token": "",
+                                    "raw_result": text
+                                }
+                            # Try JSON parse
+                            try:
+                                data = json.loads(text)
+                                return {
+                                    "url": data.get("url", ""),
+                                    "feed_id": data.get("feed_id", ""),
+                                    "xsec_token": data.get("xsec_token", "")
+                                }
+                            except json.JSONDecodeError:
+                                logger.warning(f"Could not parse result as JSON: {text[:200]}")
+                                # Return empty but mark as potential success
+                                return {"url": "", "feed_id": "", "xsec_token": "", "raw_result": text}
+
+                return result
     except Exception as e:
         logger.error(f"Failed to publish post: {e}")
         return None
@@ -145,26 +276,27 @@ async def post_pinned_comment(
     comment_content: str
 ) -> bool:
     """Post a comment and pin it to the top."""
+    from mcp.client.session import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
     logger.info("Posting pinned comment...")
 
     try:
-        from mcp import use_mcp_tool
+        async with streamablehttp_client("http://localhost:18060/mcp") as (read, write, session_id):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
 
-        # Post the comment
-        result = await use_mcp_tool(
-            server_name="xiaohongshu-mcp",
-            tool_name="post_comment_to_feed",
-            arguments={
-                "feed_id": feed_id,
-                "xsec_token": xsec_token,
-                "content": comment_content
-            }
-        )
+                # Post the comment
+                result = await session.call_tool("post_comment_to_feed", {
+                    "feed_id": feed_id,
+                    "xsec_token": xsec_token,
+                    "content": comment_content
+                })
 
-        # Note: Pinning requires manual action in XHS app
-        # The comment will be posted but not automatically pinned
-        logger.info("Comment posted. Please pin it manually in XHS app.")
-        return True
+                # Note: Pinning requires manual action in XHS app
+                # The comment will be posted but not automatically pinned
+                logger.info("Comment posted. Please pin it manually in XHS app.")
+                return True
     except Exception as e:
         logger.error(f"Failed to post comment: {e}")
         return False
@@ -176,19 +308,35 @@ async def main():
     print("XHS 5+1 Publishing - Detailed Posts + Summary")
     print("=" * 60)
 
+    # Get project root directory
+    project_root = Path(__file__).parent.parent
+
     # Load papers
-    with open('storage/selected_papers.json', 'r') as f:
+    with open(project_root / 'storage/selected_papers.json', 'r') as f:
         papers = json.load(f)
 
-    # Filter AI-related papers
-    ai_papers = [p for p in papers if any(cat in p.get('categories', '[]') for cat in ['cs.CL', 'cs.AI', 'cs.LG', 'cs.MA'])]
+    # Use all selected papers (they are already filtered)
+    # Only filter by categories if the field exists
+    ai_papers = []
+    for p in papers:
+        categories = p.get('categories', '')
+        if not categories:
+            # No categories field, include by default
+            ai_papers.append(p)
+        elif isinstance(categories, str):
+            if any(cat in categories for cat in ['cs.CL', 'cs.AI', 'cs.LG', 'cs.MA']):
+                ai_papers.append(p)
+        elif isinstance(categories, list):
+            if any(cat in categories for cat in ['cs.CL', 'cs.AI', 'cs.LG', 'cs.MA']):
+                ai_papers.append(p)
+
     ai_papers = ai_papers[:5]  # Limit to 5 papers
 
     print(f"\n准备发布 {len(ai_papers)} 篇AI相关论文...")
 
     # Initialize
     llm_client = BailianClient()
-    output_dir = Path("storage/xhs_posts")
+    output_dir = project_root / "storage/xhs_posts"
     output_dir.mkdir(exist_ok=True)
 
     published_posts = []
@@ -207,18 +355,20 @@ async def main():
             print(f"  ❌ Failed to generate content")
             continue
 
-        # Create cover
-        cover_path = await create_single_paper_cover(paper, output_dir)
-        if not cover_path:
-            print(f"  ❌ Failed to create cover, using fallback")
-            cover_path = "storage/cover_fallback.jpg"
+        # Create images (all PDF pages, up to 18 for XHS limit)
+        images = await create_single_paper_images(paper, output_dir, max_pages=18)
+        if not images:
+            print(f"  ❌ Failed to create images")
+            continue
 
-        # Publish
+        print(f"  📷 Images: {len(images)} PDF pages")
+
+        # Publish with multiple images
         result = await publish_single_post(
             title=content.get('title', ''),
             content=content.get('content', ''),
             tags=content.get('tags', []),
-            cover_image=cover_path
+            images=images  # Pass all images (cover + key figures)
         )
 
         if result:
@@ -250,16 +400,34 @@ async def main():
         print("❌ Failed to generate summary content")
         return
 
-    # Create summary cover (use first paper's cover or fallback)
-    summary_cover = "storage/xhs_cover.jpg"
-    if not Path(summary_cover).exists():
-        summary_cover = "storage/cover_fallback.jpg"
+    # Create summary cover using 5 paper first pages
+    print("Creating summary cover with 5 paper first pages...")
+    summary_images = []
+
+    for paper in ai_papers[:5]:
+        # Get first page image for each paper
+        first_page = output_dir / f"{paper['arxiv_id']}_page_1.png"
+        if first_page.exists():
+            summary_images.append(str(first_page))
+        else:
+            # Try to get from covers directory
+            cover_path = project_root / f"storage/covers/{paper['arxiv_id']}.png"
+            if cover_path.exists():
+                summary_images.append(str(cover_path))
+
+    if not summary_images:
+        # Fallback to default cover
+        fallback = project_root / "storage/cover_fallback.jpg"
+        if fallback.exists():
+            summary_images = [str(fallback)]
+
+    print(f"  📷 Summary cover: {len(summary_images)} paper first pages")
 
     summary_result = await publish_single_post(
         title=summary_content.get('title', '今日AI论文精选'),
         content=summary_content.get('content', ''),
         tags=summary_content.get('tags', []),
-        cover_image=summary_cover
+        images=summary_images  # Use 5 paper first pages as cover
     )
 
     if summary_result:

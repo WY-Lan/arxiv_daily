@@ -42,6 +42,16 @@ storage/*.pdf
 storage/*.png
 storage/*.jpg
 
+# Generated XHS content
+storage/xhs_posts/*.png
+storage/xhs_posts/*.json
+storage/covers/*.pdf
+storage/covers/*.png
+
+# Generated content files
+storage/xhs_*.json
+storage/xhs_*.md
+
 # Cookies and credentials
 cookies.json
 *.pem

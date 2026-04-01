@@ -121,7 +121,7 @@ async def run_cli():
 
     parser.add_argument(
         "command",
-        choices=["run", "schedule", "fetch", "select", "publish", "config", "review", "wechat"],
+        choices=["run", "schedule", "fetch", "select", "publish", "config", "review", "wechat", "xhs"],
         help="Command to execute"
     )
 
@@ -176,6 +176,12 @@ async def run_cli():
         "--publish",
         action="store_true",
         help="Publish drafts immediately (WeChat only)"
+    )
+
+    # XHS command options
+    parser.add_argument(
+        "--arxiv-id",
+        help="Arxiv paper ID for single paper publishing to XHS (e.g., 2603.26512)"
     )
 
     args = parser.parse_args()
@@ -276,6 +282,21 @@ async def run_cli():
             elif args.mode == "single":
                 # Single paper mode (requires --count for which paper)
                 print("Single paper mode - use nplus1 mode for full publishing")
+
+        elif args.command == "xhs":
+            # Xiaohongshu publishing
+            if args.arxiv_id:
+                # Single paper publishing
+                from tools.publish_xhs_single import publish_single_paper_to_xhs
+                result = await publish_single_paper_to_xhs(args.arxiv_id)
+                if result.get('success'):
+                    print(f"\n✅ Published successfully: {result.get('url')}")
+                else:
+                    print(f"\n❌ Failed: {result.get('error')}")
+            else:
+                # Batch publishing (5+1 mode)
+                from tools.publish_xhs_5plus1 import main as xhs_main
+                await xhs_main()
 
         elif args.command == "config":
             # Show configuration
