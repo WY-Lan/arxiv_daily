@@ -195,6 +195,16 @@ class Settings(BaseSettings):
     WECHAT_APP_ID: str = Field(default="")
     WECHAT_APP_SECRET: str = Field(default="")
 
+    # Douyin (TikTok China)
+    DOUYIN_MCP_PATH: str = Field(
+        default="",
+        description="Path to douyin-upload-mcp-skill directory"
+    )
+    DOUYIN_MCP_ENABLED: bool = Field(
+        default=True,
+        description="Enable Douyin publishing via MCP"
+    )
+
     # Scheduling
     SCHEDULE_HOUR: int = Field(default=9, description="Hour to run daily task (24h format)")
     SCHEDULE_MINUTE: int = Field(default=0, description="Minute to run daily task")

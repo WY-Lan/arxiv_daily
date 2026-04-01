@@ -1,92 +1,169 @@
 [
   {
-    "arxiv_id": "2603.15611v1",
-    "title": "Code-A1: Adversarial Evolving of Code LLM and Test LLM via Reinforcement Learning",
-    "authors": "[\"Aozhe Wang\", \"Yuchen Yan\", \"Nan Zhou\", \"Zhengxi Lu\", \"Weiming Lu\", \"Jun Xiao\", \"Yueting Zhuang\", \"Yongliang Shen\"]",
-    "abstract": "Reinforcement learning for code generation relies on verifiable rewards from unit test pass rates. Yet high-quality test suites are scarce, existing datasets offer limited coverage, and static rewards fail to adapt as models improve. Recent self-play methods unify code and test generation in a single model, but face a inherent dilemma: white-box access leads to self-collusion where the model produces trivial tests for easy rewards, yet black-box restriction yields generic tests that miss implementation-specific bugs. We introduce Code-A1, an adversarial co-evolution framework that jointly optimizes a Code LLM and a Test LLM with opposing objectives. The Code LLM is rewarded for passing more tests, while the Test LLM is rewarded for exposing more defects. This architectural separation eliminates self-collusion risks and safely enables white-box test generation, where the Test LLM can inspect candidate code to craft targeted adversarial tests. We further introduce a Mistake Book mechanism for experience replay and a composite reward balancing test validity with adversarial difficulty. Experiments on Qwen2.5-Coder models demonstrate that Code-A1 achieves code generation performance matching or exceeding models trained on human-annotated tests, while significantly improving test generation capability.",
-    "pdf_url": "https://arxiv.org/pdf/2603.15611v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.CL\"]"
+    "arxiv_id": "2603.26512",
+    "title": "CADSmith: Multi-Agent CAD Generation with Programmatic Geometric Validation",
+    "abstract": "Existing methods for text-to-CAD generation either operate in a single pass with no geometric verification or rely on lossy visual feedback that cannot resolve dimensional errors. We present CADSmith, a multi-agent pipeline that generates CadQuery code from natural language. It then undergoes an iterative refinement process through two nested correction loops: an inner loop that resolves execution errors and an outer loop grounded in programmatic geometric validation. The outer loop combines exact measurements from the OpenCASCADE kernel (bounding box dimensions, volume, solid validity) with holistic visual assessment from an independent vision-language model Judge. This provides both the numerical precision and the high-level shape awareness needed to converge on the correct geometry. The system uses retrieval-augmented generation over API documentation rather than fine-tuning, maintaining a current database as the underlying CAD library evolves. We evaluate on a custom benchmark of 100 prompts in three difficulty tiers (T1 through T3) with three ablation configurations. Against a zero-shot baseline, CADSmith achieves a 100% execution rate (up from 95%), improves the median F1 score from 0.9707 to 0.9846, the median IoU from 0.8085 to 0.9629, and reduces the mean Chamfer Distance from 28.37 to 0.74, demonstrating that closed-loop refinement with programmatic geometric feedback substantially improves the quality and reliability of LLM-generated CAD models.",
+    "authors": [
+      "Jesse Barkley",
+      "Rumi Loghmani",
+      "Amir Barati Farimani"
+    ],
+    "published_date": "2026-03-27 00:00:00",
+    "pdf_url": "https://arxiv.org/pdf/2603.26512.pdf",
+    "total_score": 0.89,
+    "llm_scores": {
+      "paper_id": "2603.26512",
+      "title": "CADSmith: Multi-Agent CAD Generation with Programmatic Geometric Validation",
+      "relevance_score": 0.95,
+      "quality_score": 0.85,
+      "novelty_score": 0.88,
+      "total_score": 0.89,
+      "recommend_reason": "该论文提出了结合多智能体协作与程序化几何验证的创新方法，显著提升了文本到CAD生成的精度和可靠性，具备较高的技术深度和实用价值。"
+    }
   },
   {
-    "arxiv_id": "2603.15615v1",
-    "title": "Mechanistic Origin of Moral Indifference in Language Models",
-    "authors": "[\"Lingyu Li\", \"Yan Teng\", \"Yingchun Wang\"]",
-    "abstract": "Existing behavioral alignment techniques for Large Language Models (LLMs) often neglect the discrepancy between surface compliance and internal unaligned representations, leaving LLMs vulnerable to long-tail risks. More crucially, we posit that LLMs possess an inherent state of moral indifference due to compressing distinct moral concepts into uniform probability distributions. We verify and remedy this indifference in LLMs' latent representations, utilizing 251k moral vectors constructed upon Prototype Theory and the Social-Chemistry-101 dataset. Firstly, our analysis across 23 models reveals that current LLMs fail to represent the distinction between opposed moral categories and fine-grained typicality gradients within these categories; notably, neither model scaling, architecture, nor explicit alignment reshapes this indifference. We then employ Sparse Autoencoders on Qwen3-8B, isolate mono-semantic moral features, and targetedly reconstruct their topological relationships to align with ground-truth moral vectors. This representational alignment naturally improves moral reasoning and granularity, achieving a 75% pairwise win-rate on the independent adversarial Flames benchmark. Finally, we elaborate on the remedial nature of current intervention methods from an experientialist philosophy, arguing that endogenously aligned AI might require a transformation from post-hoc corrections to proactive cultivation.",
-    "pdf_url": "https://arxiv.org/pdf/2603.15615v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.CL\", \"cs.AI\"]"
+    "arxiv_id": "2603.26266",
+    "title": "GUIDE: Resolving Domain Bias in GUI Agents through Real-Time Web Video Retrieval and Plug-and-Play Annotation",
+    "abstract": "Large vision-language models have endowed GUI agents with strong general capabilities for interface understanding and interaction. However, due to insufficient exposure to domain-specific software operation data during training, these agents exhibit significant domain bias - they lack familiarity with the specific operation workflows (planning) and UI element layouts (grounding) of particular applications, limiting their real-world task performance. In this paper, we present GUIDE (GUI Unbiasing via Instructional-Video Driven Expertise), a training-free, plug-and-play framework that resolves GUI agent domain bias by autonomously acquiring domain-specific expertise from web tutorial videos through a retrieval-augmented automated annotation pipeline. GUIDE introduces two key innovations. First, a subtitle-driven Video-RAG pipeline unlocks video semantics through subtitle analysis, performing progressive three-stage retrieval - domain classification, topic extraction, and relevance matching - to identify task-relevant tutorial videos. Second, a fully automated annotation pipeline built on an inverse dynamics paradigm feeds consecutive keyframes enhanced with UI element detection into VLMs, inferring the required planning and grounding knowledge that are injected into the agent's corresponding modules to address both manifestations of domain bias. Extensive experiments on OSWorld demonstrate GUIDE's generality as a plug-and-play component for both multi-agent systems and single-model agents. It consistently yields over 5% improvements and reduces execution steps - without modifying any model parameters or architecture - validating GUIDE as an architecture-agnostic enhancement to bridge GUI agent domain bias.",
+    "authors": [
+      "Rui Xie",
+      "Zhi Gao",
+      "Chenrui Shi",
+      "Zirui Shang",
+      "Lu Chen",
+      "Qing Li"
+    ],
+    "published_date": "2026-03-27 00:00:00",
+    "pdf_url": "https://arxiv.org/pdf/2603.26266.pdf",
+    "total_score": 0.85,
+    "llm_scores": {
+      "paper_id": "2603.26266",
+      "title": "GUIDE: Resolving Domain Bias in GUI Agents through Real-Time Web Video Retrieval and Plug-and-Play Annotation",
+      "relevance_score": 0.95,
+      "quality_score": 0.83,
+      "novelty_score": 0.87,
+      "total_score": 0.85,
+      "recommend_reason": "提出了一种创新且实用的无训练GUI代理领域偏差解决方案，提升了AI Agent在特定应用中的表现。"
+    }
   },
   {
-    "arxiv_id": "2603.15617v1",
-    "title": "HorizonMath: Measuring AI Progress Toward Mathematical Discovery with Automatic Verification",
-    "authors": "[\"Erik Y. Wang\", \"Sumeet Motwani\", \"James V. Roggeveen\", \"Eliot Hodges\", \"Dulhan Jayalath\", \"Charles London\", \"Kalyan Ramakrishnan\", \"Flaviu Cipcigan\", \"Philip Torr\", \"Alessandro Abate\"]",
-    "abstract": "Can AI make progress on important, unsolved mathematical problems? Large language models are now capable of sophisticated mathematical and scientific reasoning, but whether they can perform novel research is still widely debated and underexplored. We introduce HorizonMath, a benchmark of over 100 predominantly unsolved problems spanning 8 domains in computational and applied mathematics, paired with an open-source evaluation framework for automated verification. Our benchmark targets a class of problems where discovery is hard, requiring meaningful mathematical insight, but verification is computationally efficient and simple. Because these solutions are unknown, HorizonMath is immune to data contamination, and most state-of-the-art models score near 0%. Existing research-level benchmarks instead rely on formal proof verification or manual review, both of which are expensive to scale. Using this platform, we find two problems for which GPT 5.4 Pro proposes solutions that improve on the best-known published results, representing potential novel contributions (pending expert review). We release HorizonMath as an open challenge and a growing community resource, where correct solutions to problems in the unsolved problem classes could constitute novel results in the mathematical literature.",
-    "pdf_url": "https://arxiv.org/pdf/2603.15617v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.LG\"]"
+    "arxiv_id": "2603.26499",
+    "title": "AIRA_2: Overcoming Bottlenecks in AI Research Agents",
+    "abstract": "Existing research has identified three structural performance bottlenecks in AI research agents: (1) synchronous single-GPU execution constrains sample throughput, limiting the benefit of search; (2) a generalization gap where validation-based selection causes performance to degrade over extended search horizons; and (3) the limited capability of fixed, single-turn LLM operators imposes a ceiling on search performance. We introduce AIRA$_2$, which addresses these bottlenecks through three architectural choices: an asynchronous multi-GPU worker pool that increases experiment throughput linearly; a Hidden Consistent Evaluation protocol that delivers a reliable evaluation signal; and ReAct agents that dynamically scope their actions and debug interactively. On MLE-bench-30, AIRA$_2$ achieves a mean Percentile Rank of 71.8% at 24 hours - surpassing the previous best of 69.9% - and steadily improves to 76.0% at 72 hours. Ablation studies reveal that each component is necessary and that the \"overfitting\" reported in prior work was driven by evaluation noise rather than true data memorization.",
+    "authors": [
+      "Karen Hambardzumyan",
+      "Nicolas Baldwin",
+      "Edan Toledo",
+      "Rishi Hazra",
+      "Michael Kuchnik",
+      "Bassel Al Omari",
+      "Thomas Simon Foster",
+      "Anton Protopopov",
+      "Jean-Christophe Gagnon-Audet",
+      "Ishita Mediratta",
+      "Kelvin Niu",
+      "Michael Shvartsman",
+      "Alisia Lupidi",
+      "Alexis Audran-Reiss",
+      "Parth Pathak",
+      "Tatiana Shavrina",
+      "Despoina Magka",
+      "Hela Momand",
+      "Derek Dunfield",
+      "Nicola Cancedda",
+      "Pontus Stenetorp",
+      "Carole-Jean Wu",
+      "Jakob Nicolaus Foerster",
+      "Yoram Bachrach",
+      "Martin Josifoski"
+    ],
+    "published_date": "2026-03-27 00:00:00",
+    "pdf_url": "https://arxiv.org/pdf/2603.26499.pdf",
+    "total_score": 0.82,
+    "llm_scores": {
+      "paper_id": "2603.26499",
+      "title": "AIRA_2: Overcoming Bottlenecks in AI Research Agents",
+      "scores": {
+        "innovation": 0.88,
+        "technical_depth": 0.85,
+        "practical_value": 0.8,
+        "community_impact": 0.7
+      },
+      "total_score": 0.82,
+      "recommendation": "推荐",
+      "key_highlights": [
+        "提出异步多GPU工作池显著提升实验吞吐量",
+        "引入隐藏一致性评估协议提升评估可靠性",
+        "采用ReAct代理实现动态动作范围和交互式调试"
+      ],
+      "concerns": [
+        "社区影响力和引用尚待提升",
+        "代码和数据开放情况未明确"
+      ],
+      "summary": "AIRA_2通过架构创新有效突破AI研究代理的性能瓶颈，提升了搜索效率和评估可靠性。"
+    }
   },
   {
-    "arxiv_id": "2603.15619v1",
-    "title": "Mixture-of-Depths Attention",
-    "authors": "[\"Lianghui Zhu\", \"Yuxin Fang\", \"Bencheng Liao\", \"Shijie Wang\", \"Tianheng Cheng\", \"Zilong Huang\", \"Chen Chen\", \"Lai Wei\", \"Yutao Zeng\", \"Ya Wang\", \"Yi Lin\", \"Yu Li\", \"Xinggang Wang\"]",
-    "abstract": "Scaling depth is a key driver for large language models (LLMs). Yet, as LLMs become deeper, they often suffer from signal degradation: informative features formed in shallow layers are gradually diluted by repeated residual updates, making them harder to recover in deeper layers. We introduce mixture-of-depths attention (MoDA), a mechanism that allows each attention head to attend to sequence KV pairs at the current layer and depth KV pairs from preceding layers. We further describe a hardware-efficient algorithm for MoDA that resolves non-contiguous memory-access patterns, achieving 97.3% of FlashAttention-2's efficiency at a sequence length of 64K. Experiments on 1.5B-parameter models demonstrate that MoDA consistently outperforms strong baselines. Notably, it improves average perplexity by 0.2 across 10 validation benchmarks and increases average performance by 2.11% on 10 downstream tasks, with a negligible 3.7% FLOPs computational overhead. We also find that combining MoDA with post-norm yields better performance than using it with pre-norm. These results suggest that MoDA is a promising primitive for depth scaling. Code is released at https://github.com/hustvl/MoDA .",
-    "pdf_url": "https://arxiv.org/pdf/2603.15619v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.CL\", \"cs.AI\"]"
+    "arxiv_id": "2603.26005",
+    "title": "AutoB2G: A Large Language Model-Driven Agentic Framework For Automated Building-Grid Co-Simulation",
+    "abstract": "The growing availability of building operational data motivates the use of reinforcement learning (RL), which can learn control policies directly from data and cope with the complexity and uncertainty of large-scale building clusters. However, most existing simulation environments prioritize building-side performance metrics and lack systematic evaluation of grid-level impacts, while their experimental workflows still rely heavily on manual configuration and substantial programming expertise. Therefore, this paper proposes AutoB2G, an automated building-grid co-simulation framework that completes the entire simulation workflow solely based on natural-language task descriptions. The framework extends CityLearn V2 to support Building-to-Grid (B2G) interaction and adopts the large language model (LLM)-based SOCIA (Simulation Orchestration for Computational Intelligence with Agents) framework to automatically generate, execute, and iteratively refine the simulator. As LLMs lack prior knowledge of the implementation context of simulation functions, a codebase covering simulation configurations and functional modules is constructed and organized as a directed acyclic graph (DAG) to explicitly represent module dependencies and execution order, guiding the LLM to retrieve a complete executable path. Experimental results demonstrate that AutoB2G can effectively enable automated simulator implementations, coordinating B2G interactions to improve grid-side performance metrics.",
+    "authors": [
+      "Borui Zhang",
+      "Nariman Mahdavi",
+      "Subbu Sethuvenkatraman",
+      "Shuang Ao",
+      "Flora Salim"
+    ],
+    "published_date": "2026-03-27 00:00:00",
+    "pdf_url": "https://arxiv.org/pdf/2603.26005.pdf",
+    "total_score": 0.81,
+    "llm_scores": {
+      "paper_id": "2603.26005",
+      "title": "AutoB2G: A Large Language Model-Driven Agentic Framework For Automated Building-Grid Co-Simulation",
+      "relevance_score": 0.9,
+      "quality_score": 0.78,
+      "novelty_score": 0.82,
+      "total_score": 0.81,
+      "recommend_reason": "提出了基于大语言模型的自动化建筑-电网联合仿真框架，创新性强且具备实际应用潜力。"
+    }
   },
   {
-    "arxiv_id": "2603.15620v1",
-    "title": "Towards Generalizable Robotic Manipulation in Dynamic Environments",
-    "authors": "[\"Heng Fang\", \"Shangru Li\", \"Shuhan Wang\", \"Xuanyang Xi\", \"Dingkang Liang\", \"Xiang Bai\"]",
-    "abstract": "Vision-Language-Action (VLA) models excel in static manipulation but struggle in dynamic environments with moving targets. This performance gap primarily stems from a scarcity of dynamic manipulation datasets and the reliance of mainstream VLAs on single-frame observations, restricting their spatiotemporal reasoning capabilities. To address this, we introduce DOMINO, a large-scale dataset and benchmark for generalizable dynamic manipulation, featuring 35 tasks with hierarchical complexities, over 110K expert trajectories, and a multi-dimensional evaluation suite. Through comprehensive experiments, we systematically evaluate existing VLAs on dynamic tasks, explore effective training strategies for dynamic awareness, and validate the generalizability of dynamic data. Furthermore, we propose PUMA, a dynamics-aware VLA architecture. By integrating scene-centric historical optical flow and specialized world queries to implicitly forecast object-centric future states, PUMA couples history-aware perception with short-horizon prediction. Results demonstrate that PUMA achieves state-of-the-art performance, yielding a 6.3% absolute improvement in success rate over baselines. Moreover, we show that training on dynamic data fosters robust spatiotemporal representations that transfer to static tasks. All code and data are available at https://github.com/H-EmbodVis/DOMINO.",
-    "pdf_url": "https://arxiv.org/pdf/2603.15620v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.CV\", \"cs.RO\"]"
-  },
-  {
-    "arxiv_id": "2603.12958v1",
-    "title": "Vocabulary aggregation",
-    "authors": "[\"Marco LiCalzi\", \"M. Alperen Yasar\"]",
-    "abstract": "A vocabulary is a list of words designating subsets from a grand set X. We model a vocabulary as a partition of X and study the aggregation of individual vocabularies into a collective one. We characterize aggregation rules when X is linearly ordered and each word of the vocabulary spans an order interval. We allow for individual vocabularies to differ both in the number and in the span of their words. Under a suitable restriction on agents' preferences, we show that our aggregation rules are strategy-proof.",
-    "pdf_url": "https://arxiv.org/pdf/2603.12958v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"econ.TH\"]"
-  },
-  {
-    "arxiv_id": "2603.13189v1",
-    "title": "LLM Constitutional Multi-Agent Governance",
-    "authors": "[\"J. de Curt\\u00f2\", \"I. de Zarz\\u00e0\"]",
-    "abstract": "Large Language Models (LLMs) can generate persuasive influence strategies that shift cooperative behavior in multi-agent populations, but a critical question remains: does the resulting cooperation reflect genuine prosocial alignment, or does it mask erosion of agent autonomy, epistemic integrity, and distributional fairness? We introduce Constitutional Multi-Agent Governance (CMAG), a two-stage framework that interposes between an LLM policy compiler and a networked agent population, combining hard constraint filtering with soft penalized-utility optimization that balances cooperation potential against manipulation risk and autonomy pressure. We propose the Ethical Cooperation Score (ECS), a multiplicative composite of cooperation, autonomy, integrity, and fairness that penalizes cooperation achieved through manipulative means. In experiments on scale-free networks of 80 agents under adversarial conditions (70% violating candidates), we benchmark three regimes: full CMAG, naive filtering, and unconstrained optimization. While unconstrained optimization achieves the highest raw cooperation (0.873), it yields the lowest ECS (0.645) due to severe autonomy erosion (0.867) and fairness degradation (0.888). CMAG attains an ECS of 0.741, a 14.9% improvement, while preserving autonomy at 0.985 and integrity at 0.995, with only modest cooperation reduction to 0.770. The naive ablation (ECS = 0.733) confirms that hard constraints alone are insufficient. Pareto analysis shows CMAG dominates the cooperation-autonomy trade-off space, and governance reduces hub-periphery exposure disparities by over 60%. These findings establish that cooperation is not inherently desirable without governance: constitutional constraints are necessary to ensure that LLM-mediated influence produces ethically stable outcomes rather than manipulative equilibria.",
-    "pdf_url": "https://arxiv.org/pdf/2603.13189v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.MA\", \"cs.AI\"]"
-  },
-  {
-    "arxiv_id": "2603.13191v1",
-    "title": "From Experiments to Expertise: Scientific Knowledge Consolidation for AI-Driven Computational Research",
-    "authors": "[\"Haonan Huang\"]",
-    "abstract": "While large language models (LLMs) have transformed AI agents into proficient executors of computational materials science, performing a hundred simulations does not make a researcher. What distinguishes research from routine execution is the progressive accumulation of knowledge -- learning which approaches fail, recognizing patterns across systems, and applying understanding to new problems. However, the prevailing paradigm in AI-driven computational science treats each execution in isolation, largely discarding hard-won insights between runs. Here we present QMatSuite, an open-source platform closing this gap. Agents record findings with full provenance, retrieve knowledge before new calculations, and in dedicated reflection sessions correct erroneous findings and synthesize observations into cross-compound patterns. In benchmarks on a six-step quantum-mechanical simulation workflow, accumulated knowledge reduces reasoning overhead by 67% and improves accuracy from 47% to 3% deviation from literature -- and when transferred to an unfamiliar material, achieves 1% deviation with zero pipeline failures.",
-    "pdf_url": "https://arxiv.org/pdf/2603.13191v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"physics.comp-ph\", \"cond-mat.mtrl-sci\", \"cs.AI\"]"
-  },
-  {
-    "arxiv_id": "2603.13201v1",
-    "title": "Neuron-Aware Data Selection In Instruction Tuning For Large Language Models",
-    "authors": "[\"Xin Chen\", \"Junchao Wu\", \"Shu Yang\", \"Runzhe Zhan\", \"Zeyu Wu\", \"Min Yang\", \"Shujian Huang\", \"Lidia S. Chao\", \"Derek F. Wong\"]",
-    "abstract": "Instruction Tuning (IT) has been proven to be an effective approach to unlock the powerful capabilities of large language models (LLMs). Recent studies indicate that excessive IT data can degrade LLMs performance, while carefully selecting a small subset of high-quality IT data can significantly enhance their capabilities. Therefore, identifying the most efficient subset data from the IT dataset to effectively develop either specific or general abilities in LLMs has become a critical challenge. To address this, we propose a novel and efficient framework called NAIT. NAIT evaluates the impact of IT data on LLMs performance by analyzing the similarity of neuron activation patterns between the IT dataset and the target domain capability. Specifically, NAIT captures neuron activation patterns from in-domain datasets of target domain capabilities to construct reusable and transferable neuron activation features. It then evaluates and selects optimal samples based on the similarity between candidate samples and the expected activation features of the target capabilities. Experimental results show that training on the 10\\% Alpaca-GPT4 IT data subset selected by NAIT consistently outperforms methods that rely on external advanced models or uncertainty-based features across various tasks. Our findings also reveal the transferability of neuron activation features across different capabilities of LLMs. In particular, IT data with more logical reasoning and programmatic features possesses strong general transferability, enabling models to develop stronger capabilities across multiple tasks, while a stable core subset of data is sufficient to consistently activate fundamental model capabilities and universally improve performance across diverse tasks.",
-    "pdf_url": "https://arxiv.org/pdf/2603.13201v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.CL\"]"
-  },
-  {
-    "arxiv_id": "2603.13220v1",
-    "title": "A Generative Model of Conspicuous Consumption and Status Signaling",
-    "authors": "[\"Logan Cross\", \"Jordi Grau-Moya\", \"William A. Cunningham\", \"Alexander Sasha Vezhnevets\", \"Joel Z. Leibo\"]",
-    "abstract": "Status signaling drives human behavior and the allocation of scarce resources such as mating opportunities, yet the generative mechanisms governing how specific goods, signals, or behaviors acquire prestige remain a puzzle. Classical frameworks, such as Costly Signaling Theory, treat preferences as fixed and struggle to explain how semiotic meaning changes based on context or drifts dynamically over time, occasionally reaching tipping points. In this work, we propose a computational theory of status grounded in the theory of appropriateness, positing that status symbols emerge endogenously through a feedback loop of social observation and predictive pattern completion. We validate this theory using simulations of groups of Large Language Model (LLM)-based agents in the Concordia framework. By experimentally manipulating social visibility within naturalistic agent daily routines, we demonstrate that social interactions transform functional demand into status-seeking behavior. We observe the emergence of price run-ups and positive price elasticity (Veblen effects) for both real-world luxury items and procedurally generated synthetic goods, ruling out pretraining bias as the sole driver. Furthermore, we demonstrate that \"influencer\" agents can drive the endogenous formation of distinct subcultures through targeted sanctioning, and find that similar social influence effects generalize to non-monetary signaling behaviors. This work provides a generative bridge between micro-level cognition and macro-level economic and sociological phenomena, offering a new methodology for forecasting how cultural conventions emerge from interaction.",
-    "pdf_url": "https://arxiv.org/pdf/2603.13220v1.pdf",
-    "total_score": 0.0,
-    "categories": "[\"cs.MA\"]"
+    "arxiv_id": "2603.26648",
+    "title": "Vision2Web: A Hierarchical Benchmark for Visual Website Development with Agent Verification",
+    "abstract": "Recent advances in large language models have improved the capabilities of coding agents, yet systematic evaluation of complex, end-to-end website development remains limited. To address this gap, we introduce Vision2Web, a hierarchical benchmark for visual website development, spanning from static UI-to-code generation, interactive multi-page frontend reproduction, to long-horizon full-stack website development. The benchmark is constructed from real-world websites and comprises a total of 193 tasks across 16 categories, with 918 prototype images and 1,255 test cases. To support flexible, thorough and reliable evaluation, we propose workflow-based agent verification paradigm based on two complementary components: a GUI agent verifier and a VLM-based judge. We evaluate multiple visual language models instantiated under different coding-agent frameworks, revealing substantial performance gaps at all task levels, with state-of-the-art models still struggling on full-stack development.",
+    "authors": [
+      "Zehai He",
+      "Wenyi Hong",
+      "Zhen Yang",
+      "Ziyang Pan",
+      "Mingdao Liu",
+      "Xiaotao Gu",
+      "Jie Tang"
+    ],
+    "published_date": "2026-03-27 00:00:00",
+    "pdf_url": "https://arxiv.org/pdf/2603.26648.pdf",
+    "total_score": 0.78,
+    "llm_scores": {
+      "paper_id": "2603.26648",
+      "title": "Vision2Web: A Hierarchical Benchmark for Visual Website Development with Agent Verification",
+      "scores": {
+        "innovation": 0.85,
+        "technical_depth": 0.8,
+        "practical_value": 0.8,
+        "community_impact": 0.65
+      },
+      "total_score": 0.78,
+      "recommendation": "推荐",
+      "key_highlights": [
+        "提出了层次化的视觉网站开发基准，涵盖从UI到全栈开发的多阶段任务",
+        "引入了基于工作流的代理验证范式，结合GUI代理验证器和视觉语言模型评判器",
+        "基准数据集规模较大，包含真实网站原型和多样化测试用例"
+      ],
+      "concerns": [
+        "社区影响力和引用尚处于初期，需时间验证",
+        "部分技术细节和实验结果尚需更深入展示"
+      ],
+      "summary": "该论文提出了一个系统化的视觉网站开发基准和代理验证框架，推动了AI Agent在复杂前端开发任务中的评估与应用。"
+    }
   }
 ]

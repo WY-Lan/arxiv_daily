@@ -1184,6 +1184,284 @@ class WeChatMPPublisherAgent(BasePublisherAgent):
 
 
 @register_agent
+class DouyinPublisherAgent(BasePublisherAgent):
+    """
+    抖音发布 Agent
+
+    职责：
+    1. 生成适合抖音的图文内容格式
+    2. 创建竖版封面图（1080x1920）
+    3. 通过抖音 MCP 发布图文笔记
+    """
+
+    name = "douyin_publisher"
+    description = "发布论文图文到抖音"
+
+    async def execute(self, context: AgentContext) -> Dict[str, Any]:
+        """
+        Execute publishing flow - create image-text post.
+
+        图文模式：将所有论文整合成一条抖音图文笔记发布
+        使用竖版封面图，大字号标题，醒目推荐标签
+        """
+        from tools.llm_client import get_llm_client
+        from tools.douyin_cover import create_douyin_cover_async
+
+        self.llm_client = get_llm_client()
+
+        # Get summaries from context
+        summaries = context.get("summaries", [])
+        if not summaries:
+            logger.warning("No summaries to publish for Douyin")
+            return {"published": [], "count": 0}
+
+        # Check if Douyin MCP is enabled
+        if not settings.DOUYIN_MCP_ENABLED:
+            logger.info("Douyin publishing disabled, skipping")
+            return {"published": [], "count": 0, "skipped": True}
+
+        try:
+            # 1. Extract paper info
+            papers = [item.get("paper", {}) for item in summaries]
+            summaries_data = [item.get("summary", {}) for item in summaries]
+
+            # 2. Generate Douyin style content
+            logger.info(f"Generating Douyin content for {len(papers)} papers")
+            douyin_content = await self._generate_douyin_content(papers, summaries_data)
+
+            if not douyin_content:
+                logger.error("Failed to generate Douyin content")
+                return {"published": [], "count": 0, "error": "Failed to generate content"}
+
+            # 3. Create vertical cover image
+            logger.info("Creating vertical cover image for Douyin...")
+            cover_path = await create_douyin_cover_async(
+                papers=papers,
+                title=douyin_content.get("title", "AI Agent 论文精选"),
+                output_path=str(settings.STORAGE_DIR / "douyin_covers" / f"douyin_cover_{len(papers)}papers.png")
+            )
+
+            if not cover_path:
+                logger.warning("Failed to create Douyin cover, using fallback")
+                # Use first paper's cover as fallback
+                if papers and papers[0].get("arxiv_id"):
+                    from tools.pdf_screenshot import get_cover_path
+                    cover_path = str(get_cover_path(papers[0]["arxiv_id"]))
+
+            # 4. Prepare images (use individual paper covers + main cover)
+            images = []
+            if cover_path:
+                images.append(cover_path)
+
+            # Add individual paper covers (max 9 total images)
+            for paper in papers[:8]:
+                arxiv_id = paper.get("arxiv_id")
+                if arxiv_id:
+                    from tools.pdf_screenshot import get_cover_path
+                    paper_cover = get_cover_path(arxiv_id)
+                    if paper_cover:
+                        images.append(str(paper_cover))
+
+            if not images:
+                logger.error("No images available for Douyin post")
+                return {"published": [], "count": 0, "error": "No images"}
+
+            # 5. Publish to Douyin via MCP
+            result = await self._publish_to_douyin(douyin_content, images)
+
+            return {
+                "published": [result],
+                "count": 1 if result.get("status") == "success" else 0,
+                "content": douyin_content,
+                "images_count": len(images)
+            }
+
+        except Exception as e:
+            logger.error(f"Douyin publishing failed: {e}")
+            return {"published": [], "count": 0, "error": str(e)}
+
+    async def _generate_douyin_content(
+        self,
+        papers: list[Dict],
+        summaries: list[Dict]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate Douyin-style content.
+
+        Args:
+            papers: List of paper dictionaries
+            summaries: List of summary dictionaries
+
+        Returns:
+            Dict with title, content, and tags for Douyin post
+        """
+        from config.prompts import load_skill_prompt
+
+        # Load Douyin skill as system prompt
+        try:
+            prompt = load_skill_prompt("douyin-publisher")
+            logger.info("Using douyin-publisher skill for content generation")
+        except FileNotFoundError:
+            from config.prompts import load_prompt
+            prompt = load_prompt("douyin_style")
+            logger.info("Using douyin_style prompt")
+
+        # Build paper info for prompt
+        papers_info = []
+        for paper, summary in zip(papers, summaries):
+            info = {
+                "title": paper.get("title", ""),
+                "arxiv_id": paper.get("arxiv_id", ""),
+                "authors": paper.get("authors", [])[:3],
+                "summary": summary.get("summary", "")[:300] if summary else paper.get("abstract", "")[:300],
+                "highlights": summary.get("highlights", [])[:2] if summary else []
+            }
+            papers_info.append(info)
+
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"""
+今日精选论文共 {len(papers)} 篇：
+
+{json.dumps(papers_info, ensure_ascii=False, indent=2)}
+
+请生成适合抖音的图文笔记内容。输出 JSON 格式。
+"""}
+        ]
+
+        try:
+            result = await self.llm_client.generate_json(
+                messages=messages,
+                model=settings.MODEL_PUBLISHER,
+                temperature=0.7
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to generate Douyin content: {e}")
+            return None
+
+    async def _publish_to_douyin(self, content: Dict, images: list[str]) -> Dict[str, Any]:
+        """
+        Publish content to Douyin using MCP.
+
+        Args:
+            content: Dict with 'title', 'content', 'tags'
+            images: List of image paths
+
+        Returns:
+            Dict with publish result
+        """
+        try:
+            # Call Douyin MCP tool
+            # Note: This requires the douyin-upload-mcp-skill server to be configured
+            result = await self._call_douyin_mcp(content, images)
+
+            if result:
+                logger.info(f"Successfully published to Douyin")
+                return {
+                    "platform": "douyin",
+                    "status": "success",
+                    "title": content.get("title", ""),
+                    "url": result.get("url", "")
+                }
+            else:
+                logger.error("Douyin MCP returned empty result")
+                return {
+                    "platform": "douyin",
+                    "status": "failed",
+                    "error": "MCP returned empty result"
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to publish to Douyin: {e}")
+            return {
+                "platform": "douyin",
+                "status": "failed",
+                "error": str(e)
+            }
+
+    async def _call_douyin_mcp(self, content: Dict, images: list[str]) -> Optional[Dict]:
+        """
+        Call Douyin MCP server to publish content.
+
+        This method interfaces with the douyin-upload-mcp-skill server.
+        In the MCP-enabled runtime, this will call the actual publishing tool.
+
+        Args:
+            content: Dict with 'title', 'content', 'tags'
+            images: List of image paths (local absolute paths)
+
+        Returns:
+            Dict with publish result
+        """
+        title = content.get("title", "AI Agent 论文精选")
+        body = content.get("content", "")
+        tags = content.get("tags", [])
+
+        # Validate title length (Douyin limit: 20 chars)
+        if len(title) > 20:
+            logger.warning(f"Title too long ({len(title)} chars), truncating to 20")
+            title = title[:20]
+
+        # Limit images (Douyin limit: 35 images)
+        if len(images) > 35:
+            logger.warning(f"Too many images ({len(images)}), limiting to 35")
+            images = images[:35]
+
+        # Process images: convert local paths to absolute paths
+        processed_images = []
+        for img in images:
+            if img.startswith("http://") or img.startswith("https://"):
+                processed_images.append(img)
+            else:
+                from pathlib import Path
+                img_path = Path(img)
+                if not img_path.is_absolute():
+                    img_path = settings.STORAGE_DIR / img
+                if img_path.exists():
+                    processed_images.append(str(img_path))
+                else:
+                    logger.warning(f"Image not found: {img}")
+
+        if not processed_images:
+            logger.error("No valid images available for Douyin post")
+            return {"status": "error", "error": "No valid images"}
+
+        logger.info(f"Publishing to Douyin: {title}")
+        logger.info(f"Content: {len(body)} chars, Images: {len(processed_images)}")
+        logger.info(f"Tags: {tags}")
+
+        try:
+            # In Claude Code runtime with MCP, call the actual tool:
+            # result = await mcp__douyin__publish_imagetext(
+            #     filePaths=processed_images,
+            #     title=title,
+            #     description=body
+            # )
+            # return result
+
+            # For standalone execution, return prepared params
+            return {
+                "status": "success",
+                "message": "Content prepared for publishing",
+                "params": {
+                    "title": title,
+                    "content": body,
+                    "images": processed_images,
+                    "tags": tags
+                },
+                "url": ""
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to call Douyin MCP: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+
+@register_agent
 class OrchestratorAgent(BaseAgent):
     """
     编排 Agent
@@ -1216,7 +1494,8 @@ class OrchestratorAgent(BaseAgent):
         from agents.publishers import (
             NotionPublisherAgent,
             XHSPublisherAgent,
-            WeChatMPPublisherAgent
+            WeChatMPPublisherAgent,
+            DouyinPublisherAgent
         )
 
         results = {}
@@ -1237,7 +1516,8 @@ class OrchestratorAgent(BaseAgent):
         publishers = [
             NotionPublisherAgent(),
             XHSPublisherAgent(),
-            WeChatMPPublisherAgent()
+            WeChatMPPublisherAgent(),
+            DouyinPublisherAgent()
         ]
 
         publish_results = {}

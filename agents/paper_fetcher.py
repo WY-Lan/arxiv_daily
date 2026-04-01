@@ -425,6 +425,9 @@ class SelectionAgent(BaseAgent):
                 "abstract": paper.get("abstract"),
                 "authors": paper.get("authors"),
                 "published_date": paper.get("published_date"),
+                "pdf_url": paper.get("pdf_url"),  # 保留PDF URL用于后续发布
+                "abs_url": paper.get("abs_url"),  # 保留摘要页URL
+                "categories": paper.get("categories"),  # 保留分类信息
                 "citation_count": paper.get("citation_count", 0),
                 "influence_score": paper.get("influence_score", 0),
                 "community_score": paper.get("community_score", 0),

@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "arxiv_id": "2603.26512",
+    "title": "CADSmith: Multi-Agent CAD Generation with Programmatic Geometric Validation",
+    "xhs_title": "卡内基梅隆推出「多Agent几何验证」CAD生成⚙️",
+    "url": "",
+    "feed_id": "",
+    "xsec_token": ""
+  },
+  {
+    "arxiv_id": "2603.26266",
+    "title": "GUIDE: Resolving Domain Bias in GUI Agents through Real-Time Web Video Retrieval and Plug-and-Play Annotation",
+    "xhs_title": "腾讯推出「GUIDE」界面代理去偏方案✨",
+    "url": "",
+    "feed_id": "",
+    "xsec_token": ""
+  },
+  {
+    "arxiv_id": "2603.26499",
+    "title": "AIRA_2: Overcoming Bottlenecks in AI Research Agents",
+    "xhs_title": "多作者团队推出「AIRA_2」AI研究Agent突破瓶颈⚡️",
+    "url": "",
+    "feed_id": "",
+    "xsec_token": ""
+  },
+  {
+    "arxiv_id": "2603.26005",
+    "title": "AutoB2G: A Large Language Model-Driven Agentic Framework For Automated Building-Grid Co-Simulation",
+    "xhs_title": "多位作者推出「自动建筑-电网」协同仿真框架⚡️",
+    "url": "",
+    "feed_id": "",
+    "xsec_token": ""
+  },
+  {
+    "arxiv_id": "2603.26648",
+    "title": "Vision2Web: A Hierarchical Benchmark for Visual Website Development with Agent Verification",
+    "xhs_title": "清华大学推出「视觉驱动网站开发」层级基准⚡️",
+    "url": "",
+    "feed_id": "",
+    "xsec_token": ""
+  }
+]
