@@ -925,26 +925,69 @@ class XHSPublisherAgent(BasePublisherAgent):
         logger.info(f"Tags: {tags}")
 
         try:
-            # In Claude Code runtime with MCP, call the actual tool:
-            # result = await mcp__xiaohongshu-mcp__publish_content(
-            #     title=title,
-            #     content=body,
-            #     images=processed_images,
-            #     tags=tags,
-            #     is_original=False
-            # )
-            # return result
+            import aiohttp
+            mcp_url = "http://localhost:18060/mcp"
 
-            # For standalone execution, return prepared params
+            # Step 1: Initialize MCP session
+            init_payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "arxiv-daily", "version": "1.0"}
+                }
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    mcp_url,
+                    json=init_payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as resp:
+                    session_id = resp.headers.get("mcp-session-id")
+                    if not session_id:
+                        raise RuntimeError("MCP server did not return session ID — is xiaohongshu-mcp running on port 18060?")
+                    logger.info(f"MCP session initialized: {session_id}")
+
+                # Step 2: Call publish_content tool
+                publish_payload = {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "publish_content",
+                        "arguments": {
+                            "title": title,
+                            "content": body,
+                            "images": processed_images,
+                            "tags": tags,
+                            "is_original": False
+                        }
+                    }
+                }
+                async with session.post(
+                    mcp_url,
+                    json=publish_payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "mcp-session-id": session_id
+                    },
+                    timeout=aiohttp.ClientTimeout(total=300)
+                ) as resp:
+                    result_data = await resp.json()
+
+            if "error" in result_data:
+                raise RuntimeError(f"MCP error: {result_data['error']}")
+
+            content_list = result_data.get("result", {}).get("content", [])
+            result_text = content_list[0].get("text", "") if content_list else ""
+            logger.info(f"XHS publish result: {result_text}")
+
             return {
                 "status": "success",
-                "message": "Content prepared for publishing",
-                "params": {
-                    "title": title,
-                    "content": body,
-                    "images": processed_images,
-                    "tags": tags
-                },
+                "message": result_text,
                 "url": ""
             }
 
