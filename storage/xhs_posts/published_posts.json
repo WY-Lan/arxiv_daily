@@ -1,40 +1,40 @@
 [
   {
-    "arxiv_id": "2603.26512",
-    "title": "CADSmith: Multi-Agent CAD Generation with Programmatic Geometric Validation",
-    "xhs_title": "卡内基梅隆推出「多Agent几何验证」CAD生成⚙️",
+    "arxiv_id": "2604.02318",
+    "title": "Stop Wandering: Efficient Vision-Language Navigation via Metacognitive Reasoning",
+    "xhs_title": "清华大学推出「元认知导航」视觉语言智能体🧭",
     "url": "",
     "feed_id": "",
     "xsec_token": ""
   },
   {
-    "arxiv_id": "2603.26266",
-    "title": "GUIDE: Resolving Domain Bias in GUI Agents through Real-Time Web Video Retrieval and Plug-and-Play Annotation",
-    "xhs_title": "腾讯推出「GUIDE」界面代理去偏方案✨",
+    "arxiv_id": "2604.01708",
+    "title": "OpenGo: An OpenClaw-Based Robotic Dog with Real-Time Skill Switching",
+    "xhs_title": "Unitree推出「OpenClaw」实时技能切换机器人狗🐕",
     "url": "",
     "feed_id": "",
     "xsec_token": ""
   },
   {
-    "arxiv_id": "2603.26499",
-    "title": "AIRA_2: Overcoming Bottlenecks in AI Research Agents",
-    "xhs_title": "多作者团队推出「AIRA_2」AI研究Agent突破瓶颈⚡️",
+    "arxiv_id": "2604.01707",
+    "title": "Memory in the LLM Era: Modular Architectures and Strategies in a Unified Framework",
+    "xhs_title": "作者团队推出「统一框架」大模型记忆策略🧠",
     "url": "",
     "feed_id": "",
     "xsec_token": ""
   },
   {
-    "arxiv_id": "2603.26005",
-    "title": "AutoB2G: A Large Language Model-Driven Agentic Framework For Automated Building-Grid Co-Simulation",
-    "xhs_title": "多位作者推出「自动建筑-电网」协同仿真框架⚡️",
+    "arxiv_id": "2604.01687",
+    "title": "EvoSkills: Self-Evolving Agent Skills via Co-Evolutionary Verification",
+    "xhs_title": "Anthropic推出「自演进技能」Agent框架⚙️",
     "url": "",
     "feed_id": "",
     "xsec_token": ""
   },
   {
-    "arxiv_id": "2603.26648",
-    "title": "Vision2Web: A Hierarchical Benchmark for Visual Website Development with Agent Verification",
-    "xhs_title": "清华大学推出「视觉驱动网站开发」层级基准⚡️",
+    "arxiv_id": "2604.01681",
+    "title": "Bridging Large-Model Reasoning and Real-Time Control via Agentic Fast-Slow Planning",
+    "xhs_title": "清华推出「快慢规划」智能驾驶Agent⚡️",
     "url": "",
     "feed_id": "",
     "xsec_token": ""

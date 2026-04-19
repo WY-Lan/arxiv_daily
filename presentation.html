@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harness Engineering - AI Agent的约束工程</title>
+    <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;700&family=Satoshi:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* ===========================================
+           VIEWPORT FITTING: MANDATORY BASE STYLES
+           =========================================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        /* ===========================================
+           THEME: NEON CYBER
+           =========================================== */
+        :root {
+            --bg: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: rgba(18, 18, 42, 0.8);
+            --cyan: #00f5ff;
+            --magenta: #ff00ff;
+            --white: #ffffff;
+            --gray: #8888aa;
+            --gray-light: #aaaacc;
+
+            --glow-cyan: 0 0 20px rgba(0, 245, 255, 0.5);
+            --glow-magenta: 0 0 20px rgba(255, 0, 255, 0.5);
+            --glow-cyan-subtle: 0 0 10px rgba(0, 245, 255, 0.3);
+
+            --title-size: clamp(1.5rem, 5vw, 4rem);
+            --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+            --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+            --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+            --small-size: clamp(0.65rem, 1vw, 0.875rem);
+
+            --slide-padding: clamp(1rem, 4vw, 4rem);
+            --content-gap: clamp(0.5rem, 2vw, 2rem);
+            --element-gap: clamp(0.25rem, 1vw, 1rem);
+        }
+
+        body {
+            background: var(--bg);
+            font-family: 'Satoshi', sans-serif;
+            color: var(--white);
+        }
+
+        /* Grid background */
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Particles */
+        .particles {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--cyan);
+            border-radius: 50%;
+            box-shadow: var(--glow-cyan);
+            animation: float 8s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+            50% { transform: translateY(-30px) scale(1.5); opacity: 1; }
+        }
+
+        /* ===========================================
+           SLIDE STRUCTURE
+           =========================================== */
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+            max-width: min(90vw, 1200px);
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* ===========================================
+           TYPOGRAPHY
+           =========================================== */
+        .number {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(4rem, 12vw, 8rem);
+            font-weight: 700;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            line-height: 1;
+            margin-bottom: var(--element-gap);
+        }
+
+        h1 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: var(--title-size);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: var(--element-gap);
+        }
+
+        h2 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: var(--h2-size);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: var(--element-gap);
+        }
+
+        h3 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: var(--h3-size);
+            font-weight: 500;
+            margin-bottom: var(--element-gap);
+        }
+
+        p {
+            font-size: var(--body-size);
+            line-height: 1.6;
+            margin-bottom: var(--element-gap);
+        }
+
+        .accent-cyan { color: var(--cyan); text-shadow: var(--glow-cyan-subtle); }
+        .accent-magenta { color: var(--magenta); text-shadow: var(--glow-magenta); }
+        .text-gray { color: var(--gray); }
+        .text-gray-light { color: var(--gray-light); }
+
+        /* ===========================================
+           COMPONENTS
+           =========================================== */
+        .subtitle {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: var(--gray);
+            margin-bottom: var(--content-gap);
+        }
+
+        .data-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            border-radius: 8px;
+            padding: clamp(1rem, 2vw, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+            box-shadow: inset 0 0 30px rgba(0, 245, 255, 0.1);
+            margin-bottom: var(--content-gap);
+        }
+
+        .data-card.magenta {
+            border-color: rgba(255, 0, 255, 0.3);
+            box-shadow: inset 0 0 30px rgba(255, 0, 255, 0.1);
+        }
+
+        .stat-row {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.5rem, 1vw, 1rem);
+            font-size: var(--body-size);
+        }
+
+        .stat-label { color: var(--gray); }
+
+        .stat-value {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan-subtle);
+            font-weight: 700;
+        }
+
+        .stat-value.magenta {
+            color: var(--magenta);
+            text-shadow: var(--glow-magenta);
+        }
+
+        .stat-arrow {
+            font-size: clamp(1.5rem, 2vw, 2rem);
+            color: var(--magenta);
+            animation: arrowPulse 1s infinite;
+        }
+
+        @keyframes arrowPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        /* Bullet list */
+        .bullet-list {
+            list-style: none;
+            gap: clamp(0.4rem, 1vh, 1rem);
+            margin-bottom: var(--content-gap);
+        }
+
+        .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.5;
+            padding-left: clamp(1rem, 2vw, 1.5rem);
+            position: relative;
+        }
+
+        .bullet-list li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--cyan);
+        }
+
+        /* Feature grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+            margin-bottom: var(--content-gap);
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            border-radius: 6px;
+            padding: clamp(0.75rem, 1.5vw, 1rem);
+            transition: border-color 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--cyan);
+        }
+
+        .feature-card h4 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: var(--h3-size);
+            color: var(--cyan);
+            margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+        }
+
+        .feature-card p {
+            font-size: var(--small-size);
+            color: var(--gray-light);
+            margin: 0;
+        }
+
+        /* Timeline */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.5rem, 1vw, 1rem);
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            gap: clamp(0.5rem, 1vw, 1rem);
+        }
+
+        .timeline-dot {
+            width: clamp(8px, 1vw, 12px);
+            height: clamp(8px, 1vw, 12px);
+            background: var(--cyan);
+            border-radius: 50%;
+            box-shadow: var(--glow-cyan);
+            margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
+        }
+
+        .timeline-content h4 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+            color: var(--white);
+            margin-bottom: clamp(0.1rem, 0.25vw, 0.25rem);
+        }
+
+        .timeline-content p {
+            font-size: var(--small-size);
+            color: var(--gray);
+            margin: 0;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            height: clamp(4px, 0.5vw, 8px);
+            background: rgba(0, 245, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            animation: progressGrow 2s ease-out forwards;
+        }
+
+        @keyframes progressGrow {
+            from { width: 52.8%; }
+            to { width: 66.5%; }
+        }
+
+        /* Quote block */
+        .quote-block {
+            background: var(--bg-card);
+            border-left: 3px solid var(--magenta);
+            padding: clamp(1rem, 2vw, 1.5rem);
+            margin-bottom: var(--content-gap);
+        }
+
+        .quote-block p {
+            font-size: clamp(1rem, 1.8vw, 1.25rem);
+            color: var(--white);
+            font-style: italic;
+            margin: 0;
+        }
+
+        .quote-attribution {
+            font-size: var(--small-size);
+            color: var(--magenta);
+            margin-top: clamp(0.5rem, 1vw, 1rem);
+        }
+
+        /* Comparison grid */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(1rem, 2vw, 2rem);
+            margin-bottom: var(--content-gap);
+        }
+
+        .comparison-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: clamp(1rem, 2vw, 1.5rem);
+        }
+
+        .comparison-card.left {
+            border: 1px solid rgba(0, 245, 255, 0.3);
+        }
+
+        .comparison-card.right {
+            border: 1px solid rgba(255, 0, 255, 0.3);
+        }
+
+        .comparison-card h4 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            margin-bottom: clamp(0.5rem, 1vw, 1rem);
+        }
+
+        .comparison-card.left h4 { color: var(--cyan); }
+        .comparison-card.right h4 { color: var(--magenta); }
+
+        /* ===========================================
+           NAVIGATION
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: clamp(1rem, 2vw, 2rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.5rem, 1vw, 1rem);
+            z-index: 100;
+        }
+
+        .nav-dot {
+            width: clamp(8px, 1vw, 12px);
+            height: clamp(8px, 1vw, 12px);
+            background: rgba(0, 245, 255, 0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        .nav-dot:hover,
+        .nav-dot.active {
+            background: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .progress-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            z-index: 100;
+            transition: width 0.3s;
+        }
+
+        .keyboard-hint {
+            position: fixed;
+            bottom: clamp(1rem, 2vw, 2rem);
+            left: clamp(1rem, 2vw, 2rem);
+            font-size: var(--small-size);
+            color: var(--gray);
+            z-index: 100;
+        }
+
+        /* ===========================================
+           REVEAL ANIMATION
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
+        .reveal-delay-4 { transition-delay: 0.4s; }
+        .reveal-delay-5 { transition-delay: 0.5s; }
+
+        /* ===========================================
+           RESPONSIVE
+           =========================================== */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+                --h2-size: clamp(1rem, 3vw, 1.75rem);
+                --number-size: clamp(3rem, 10vw, 6rem);
+            }
+
+            .nav-dots, .keyboard-hint { display: none; }
+        }
+
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+            }
+
+            .number { font-size: clamp(2rem, 8vw, 4rem); }
+        }
+
+        @media (max-width: 600px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+
+            html { scroll-behavior: auto; }
+
+            .reveal {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        /* ===========================================
+           SPECIAL SLIDES
+           =========================================== */
+        /* Title slide */
+        .slide.title .slide-content {
+            text-align: center;
+            align-items: center;
+        }
+
+        .slide.title .number {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        /* End slide */
+        .slide.end .slide-content {
+            text-align: center;
+            align-items: center;
+        }
+
+        .end-message {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(2rem, 6vw, 4rem);
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            margin-bottom: var(--content-gap);
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-bg"></div>
+    <div class="particles">
+        <div class="particle" style="left: 10%; top: 20%; animation-delay: 0s;"></div>
+        <div class="particle" style="left: 80%; top: 30%; animation-delay: 2s; background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+        <div class="particle" style="left: 20%; top: 70%; animation-delay: 1s;"></div>
+        <div class="particle" style="left: 70%; top: 80%; animation-delay: 3s; background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+        <div class="particle" style="left: 50%; top: 50%; animation-delay: 4s;"></div>
+    </div>
+
+    <div class="progress-indicator" id="progress"></div>
+
+    <nav class="nav-dots" id="nav-dots"></nav>
+
+    <main>
+        <!-- Slide 1: Title -->
+        <section class="slide title" id="slide-1">
+            <div class="slide-content">
+                <div class="number reveal">01</div>
+                <h1 class="reveal reveal-delay-1">Harness <span class="accent-magenta">Engineering</span></h1>
+                <p class="subtitle reveal reveal-delay-2">AI Agent的约束工程</p>
+                <div class="data-card reveal reveal-delay-3" style="text-align: center;">
+                    <div class="stat-row" style="justify-content: center;">
+                        <span class="stat-label">Terminal Bench 2.0</span>
+                        <span class="stat-value">52.8%</span>
+                        <span class="stat-arrow">→</span>
+                        <span class="stat-value magenta">66.5%</span>
+                    </div>
+                    <p class="text-gray" style="margin-top: 0.5rem;">模型权重未改，仅换壳</p>
+                    <div class="progress-bar" style="width: 100%; max-width: 400px; margin: 0 auto;">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 2: What is Harness -->
+        <section class="slide" id="slide-2">
+            <div class="slide-content">
+                <div class="number reveal">02</div>
+                <h2 class="reveal reveal-delay-1">什么是 <span class="accent-cyan">Harness</span>?</h2>
+                <p class="subtitle reveal reveal-delay-2">模型是引擎，Harness是变速箱+刹车+仪表盘</p>
+                <div class="quote-block reveal reveal-delay-3">
+                    <p>"Harness是一套围绕着大语言模型建立的、纯粹的工业级管理制度"</p>
+                    <div class="quote-attribution">— Hao好聊趋势</div>
+                </div>
+                <div class="comparison-grid reveal reveal-delay-4">
+                    <div class="comparison-card left">
+                        <h4>Harness</h4>
+                        <ul class="bullet-list">
+                            <li>管住流程</li>
+                            <li>管住行为</li>
+                            <li>方向盘 → 变速箱 → 刹车</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card right">
+                        <h4>Agent Infra</h4>
+                        <ul class="bullet-list">
+                            <li>CLI、Skill、MCP</li>
+                            <li>加油站、导航</li>
+                            <li>让车跑得更顺</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: The Goldfish Problem -->
+        <section class="slide" id="slide-3">
+            <div class="slide-content">
+                <div class="number reveal">03</div>
+                <h2 class="reveal reveal-delay-1">大模型像<span class="accent-magenta">金鱼</span></h2>
+                <p class="subtitle reveal reveal-delay-2">记忆窗口有限，注意力分散</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>记不住</h4>
+                        <p>上下文窗口满了就挤掉前面的内容</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>不翻本子</h4>
+                        <p>给了记事本，却懒得去看</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>不按本子做</h4>
+                        <p>看了也不一定照着执行</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>自信地赞美</h4>
+                        <p>觉得自己做得很好，实际一团糟</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: Three Layers Overview -->
+        <section class="slide" id="slide-4">
+            <div class="slide-content">
+                <div class="number reveal">04</div>
+                <h2 class="reveal reveal-delay-1">Harness<span class="accent-cyan">三层架构</span></h2>
+                <p class="subtitle reveal reveal-delay-2">从记事本到管理制度</p>
+                <div class="timeline reveal reveal-delay-3">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>第一层：记忆与流程管控</h4>
+                            <p>让AI认认真真按本子上写的做</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item" style="--delay: 0.1s;">
+                        <div class="timeline-dot" style="background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+                        <div class="timeline-content">
+                            <h4>第二层：并发控制</h4>
+                            <p>多Agent协同，从无政府状态到红绿灯</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item" style="--delay: 0.2s;">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>第三层：验证机制</h4>
+                            <p>戳破盲目自信，Generator vs Evaluator</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: Layer 1 - Memory Evolution -->
+        <section class="slide" id="slide-5">
+            <div class="slide-content">
+                <div class="number reveal">05</div>
+                <h2 class="reveal reveal-delay-1">第一层<span class="accent-cyan">记忆外化</span></h2>
+                <p class="subtitle reveal reveal-delay-2">从空白txt到结构化面板</p>
+                <div class="timeline reveal reveal-delay-3">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>AutoGPT (2023-03)</h4>
+                            <p>空白.txt文件，模型爱写什么写什么</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Devin (2024-03)</h4>
+                            <p>结构化Planner面板，进度可视化</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+                        <div class="timeline-content">
+                            <h4>Claude Code (2025-02)</h4>
+                            <p>CLAUDE.md + scratchpad范式</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 6: Context Engineering -->
+        <section class="slide" id="slide-6">
+            <div class="slide-content">
+                <div class="number reveal">06</div>
+                <h2 class="reveal reveal-delay-1">Context <span class="accent-cyan">Engineering</span></h2>
+                <p class="subtitle reveal reveal-delay-2">Anthropic 2025-09：上下文效率与压缩</p>
+                <div class="comparison-grid reveal reveal-delay-3">
+                    <div class="comparison-card left">
+                        <h4>提效</h4>
+                        <ul class="bullet-list">
+                            <li>System Prompt模块化</li>
+                            <li>工具描述标准化</li>
+                            <li>RAG即需即取</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card right">
+                        <h4>压缩</h4>
+                        <ul class="bullet-list">
+                            <li>对话摘要压缩</li>
+                            <li>滑动窗口策略</li>
+                            <li>结构化工作笔记</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: Four Failure Modes -->
+        <section class="slide" id="slide-7">
+            <div class="slide-content">
+                <div class="number reveal">07</div>
+                <h2 class="reveal reveal-delay-1">四种<span class="accent-magenta">失败模式</span></h2>
+                <p class="subtitle reveal reveal-delay-2">Anthropic 2025-11：记事本发了，实际全面溃败</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>提前交卷</h4>
+                        <p>做了三个功能就宣布"项目完成"</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>环境盲区</h4>
+                        <p>环境有Bug，写的东西跑不起来</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>虚标完成</h4>
+                        <p>清单标done，但实际功能是坏的</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>失忆实习生</h4>
+                        <p>每轮新运行都重新摸索项目结构</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: Layer 1 Solutions -->
+        <section class="slide" id="slide-8">
+            <div class="slide-content">
+                <div class="number reveal">08</div>
+                <h2 class="reveal reveal-delay-1">第一层<span class="accent-cyan">解决方案</span></h2>
+                <p class="subtitle reveal reveal-delay-2">从记事本到管理制度</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>JSON物理锁</h4>
+                        <p>功能清单不可修改，只能标状态</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>三步唤醒</h4>
+                        <p>pwd + git log + progress.txt</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Git存档回滚</h4>
+                        <p>时间机器，不指望金鱼自己撤销</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Context Reset</h4>
+                        <p>换新金鱼 + 交接单</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: Anthropic vs OpenAI -->
+        <section class="slide" id="slide-9">
+            <div class="slide-content">
+                <div class="number reveal">09</div>
+                <h2 class="reveal reveal-delay-1">两种<span class="accent-cyan">路径</span></h2>
+                <p class="subtitle reveal reveal-delay-2">管流程 vs 管环境</p>
+                <div class="comparison-grid reveal reveal-delay-3">
+                    <div class="comparison-card left">
+                        <h4>Anthropic：管流程</h4>
+                        <ul class="bullet-list">
+                            <li>打卡、翻本子、按清单干活</li>
+                            <li>JSON物理锁、三步唤醒</li>
+                            <li>Git存档、Context Reset</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card right">
+                        <h4>OpenAI：管环境</h4>
+                        <ul class="bullet-list">
+                            <li>Repo-as-truth：仓库即现实</li>
+                            <li>AGENTS.md当目录，而非百科</li>
+                            <li>Linter强制检查 + Doc-gardening</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="data-card magenta reveal reveal-delay-4">
+                    <div class="stat-row">
+                        <span class="stat-label">OpenAI Codex团队</span>
+                        <span class="stat-value magenta">5个月</span>
+                        <span class="stat-arrow" style="color: var(--cyan);">→</span>
+                        <span class="stat-value">100万行代码</span>
+                    </div>
+                    <p class="text-gray" style="margin-top: 0.5rem;">1500 PR，0行人工输入</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10: Layer 2 - Concurrency -->
+        <section class="slide" id="slide-10">
+            <div class="slide-content">
+                <div class="number reveal">10</div>
+                <h2 class="reveal reveal-delay-1">第二层<span class="accent-magenta">并发控制</span></h2>
+                <p class="subtitle reveal reveal-delay-2">多Agent同时工作 = 无政府状态</p>
+                <div class="data-card reveal reveal-delay-3">
+                    <p class="text-gray-light">Cursor 2026-01 案例：</p>
+                    <div class="stat-row" style="margin-top: 1rem;">
+                        <span class="stat-label">20个Agent并发</span>
+                        <span class="stat-arrow">→</span>
+                        <span class="stat-value" style="font-size: clamp(1.2rem, 2vw, 1.8rem); color: var(--magenta);">有效吞吐降至2-3个</span>
+                    </div>
+                    <p class="text-gray" style="margin-top: 0.5rem;">锁机制瓶颈 → Agent开始摸鱼（改注释、调空格）</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 11: Layer 2 Solutions -->
+        <section class="slide" id="slide-11">
+            <div class="slide-content">
+                <div class="number reveal">11</div>
+                <h2 class="reveal reveal-delay-1">第二层<span class="accent-cyan">解决方案</span></h2>
+                <p class="subtitle reveal reveal-delay-2">三层阶级 + DAG门控</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>Planner</h4>
+                        <p>规划器，审批签字后Worker才能动</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Worker</h4>
+                        <p>执行器，提交交接报告</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Judge</h4>
+                        <p>裁判，维持全局视野</p>
+                    </div>
+                    <div class="feature-card magenta">
+                        <h4 style="color: var(--magenta);">DAG单行道</h4>
+                        <p>没有Planner审批，Worker被锁死</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 12: Anthropic Compiler Case -->
+        <section class="slide" id="slide-12">
+            <div class="slide-content">
+                <div class="number reveal">12</div>
+                <h2 class="reveal reveal-delay-1">Anthropic<span class="accent-magenta">编译器案例</span></h2>
+                <p class="subtitle reveal reveal-delay-2">16个Claude并行写C编译器</p>
+                <div class="data-card reveal reveal-delay-3">
+                    <div class="stat-row">
+                        <span class="stat-value magenta">2000</span>
+                        <span class="stat-label">Session</span>
+                    </div>
+                    <div class="stat-row" style="margin-top: 0.5rem;">
+                        <span class="stat-value">2周</span>
+                        <span class="stat-arrow">→</span>
+                        <span class="stat-value magenta">$20,000</span>
+                        <span class="stat-label">API费用</span>
+                    </div>
+                    <div class="stat-row" style="margin-top: 0.5rem;">
+                        <span class="stat-label">产出</span>
+                        <span class="stat-value">10万行代码</span>
+                        <span class="stat-label">可编译Linux内核</span>
+                    </div>
+                </div>
+                <div class="quote-block reveal reveal-delay-4">
+                    <p>引入GCC作为标准答案参照 + 二分查找定位Bug</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 13: Layer 3 - Verification -->
+        <section class="slide" id="slide-13">
+            <div class="slide-content">
+                <div class="number reveal">13</div>
+                <h2 class="reveal reveal-delay-1">第三层<span class="accent-cyan">验证机制</span></h2>
+                <p class="subtitle reveal reveal-delay-2">戳破盲目自信</p>
+                <div class="quote-block reveal reveal-delay-3">
+                    <p>"让它评估自己刚刚完成的工作，它几乎总是'自信地赞美'，哪怕在人类观察者看来质量明显平庸"</p>
+                    <div class="quote-attribution">— Anthropic 2026-03</div>
+                </div>
+                <div class="feature-grid reveal reveal-delay-4">
+                    <div class="feature-card">
+                        <h4>功能性错误</h4>
+                        <p>测试套件抓</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>结构性违规</h4>
+                        <p>Linter抓</p>
+                    </div>
+                    <div class="feature-card magenta">
+                        <h4 style="color: var(--magenta);">用户体验偏差</h4>
+                        <p>Evaluator端到端验证</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 14: Generator vs Evaluator -->
+        <section class="slide" id="slide-14">
+            <div class="slide-content">
+                <div class="number reveal">14</div>
+                <h2 class="reveal reveal-delay-1">Generator vs <span class="accent-magenta">Evaluator</span></h2>
+                <p class="subtitle reveal reveal-delay-2">GAN灵感：选手和评委必须分开</p>
+                <div class="comparison-grid reveal reveal-delay-3">
+                    <div class="comparison-card left">
+                        <h4>Generator</h4>
+                        <ul class="bullet-list">
+                            <li>执行任务</li>
+                            <li>自信地生成</li>
+                            <li>被批评后重写</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card right">
+                        <h4>Evaluator</h4>
+                        <ul class="bullet-list">
+                            <li>校准为"怀疑态度"</li>
+                            <li>亲自动手验货</li>
+                            <li>输出PASS/FAIL/PARTIAL</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="data-card magenta reveal reveal-delay-4">
+                    <p class="text-gray-light">Sprint Contract：开工前先协商验收标准</p>
+                    <p class="text-gray-light" style="margin-top: 0.5rem;">沙盒隔离：测试环境只读，防止篡改评分</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 15: Cursor 8-channel -->
+        <section class="slide" id="slide-15">
+            <div class="slide-content">
+                <div class="number reveal">15</div>
+                <h2 class="reveal reveal-delay-1">Cursor<span class="accent-magenta">8通道盲审</span></h2>
+                <p class="subtitle reveal reveal-delay-2">更极端、更昂贵的验证</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>8通道并行</h4>
+                        <p>同一个代码差异，8个独立Bugbot</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>顺序打乱</h4>
+                        <p>推理路径不同，幻觉不易同步</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>多数投票</h4>
+                        <p>单通道标记直接过滤</p>
+                    </div>
+                    <div class="feature-card magenta">
+                        <h4 style="color: var(--magenta);">验证器模型</h4>
+                        <p>捕捉残留误报</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 16: Compensation Surface -->
+        <section class="slide" id="slide-16">
+            <div class="slide-content">
+                <div class="number reveal">16</div>
+                <h2 class="reveal reveal-delay-1"><span class="accent-cyan">补偿面</span>迁移</h2>
+                <p class="subtitle reveal reveal-delay-2">每个组件 = 补偿模型做不到的事</p>
+                <div class="timeline reveal reveal-delay-3">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>加是为了补偿</h4>
+                            <p>Context Reset 补记忆、Evaluator 补评估</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+                        <div class="timeline-content">
+                            <h4>模型进步 → 补偿变成overhead</h4>
+                            <p>留着它不是保险，是拖累</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>拆是因为模型能做了</h4>
+                            <p>Opus 4.6：Context Reset拆了、Sprint Contract拆了</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 17: Moat -->
+        <section class="slide" id="slide-17">
+            <div class="slide-content">
+                <div class="number reveal">17</div>
+                <h2 class="reveal reveal-delay-1">护城河<span class="accent-cyan">在哪</span>?</h2>
+                <p class="subtitle reveal reveal-delay-2">不是厚度，而是迁移速度</p>
+                <div class="quote-block reveal reveal-delay-3">
+                    <p>"一劳永逸的Harness方案 = 没遇到那堵墙"</p>
+                </div>
+                <div class="feature-grid reveal reveal-delay-4">
+                    <div class="feature-card magenta">
+                        <h4 style="color: var(--magenta);">不是护城河</h4>
+                        <p>最完善的验证层、最复杂的架构</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>真正的能力</h4>
+                        <p>知道下一寸该加什么，上一寸该拆什么</p>
+                    </div>
+                </div>
+                <div class="data-card reveal reveal-delay-5">
+                    <div class="stat-row">
+                        <span class="stat-label">Cursor发现：</span>
+                        <span class="stat-value">Prompt</span>
+                        <span class="stat-arrow">></span>
+                        <span class="stat-value magenta">Harness</span>
+                        <span class="stat-arrow">></span>
+                        <span class="stat-value">Model</span>
+                    </div>
+                    <p class="text-gray" style="margin-top: 0.5rem;">边际影响力排序（前提：Harness已搭好）</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 18: Claude Code Source -->
+        <section class="slide" id="slide-18">
+            <div class="slide-content">
+                <div class="number reveal">18</div>
+                <h2 class="reveal reveal-delay-1">Claude Code<span class="accent-magenta">源码验证</span></h2>
+                <p class="subtitle reveal reveal-delay-2">51万行TypeScript，2026-03-31泄漏</p>
+                <div class="data-card reveal reveal-delay-3">
+                    <div class="stat-row">
+                        <span class="stat-value magenta">44</span>
+                        <span class="stat-label">个feature flag = 44个可拆补丁</span>
+                    </div>
+                    <div class="stat-row" style="margin-top: 0.5rem;">
+                        <span class="stat-label">三层壳全部落地</span>
+                    </div>
+                </div>
+                <div class="feature-grid reveal reveal-delay-4">
+                    <div class="feature-card">
+                        <h4>六层记忆体系</h4>
+                        <p>公司→项目→个人→会话→习惯→对话</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>梦系统 autoDream</h4>
+                        <p>后台整理笔记，趁用户不用时大扫除</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Team Mode</h4>
+                        <p>队友长期驻扎，上下文控制在40%</p>
+                    </div>
+                    <div class="feature-card magenta">
+                        <h4 style="color: var(--magenta);">Verification Agent</h4>
+                        <p>被要求"try to break it"</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 19: New Dimensions -->
+        <section class="slide" id="slide-19">
+            <div class="slide-content">
+                <div class="number reveal">19</div>
+                <h2 class="reveal reveal-delay-1">账外<span class="accent-cyan">新维度</span></h2>
+                <p class="subtitle reveal reveal-delay-2">从Harness向Infra蔓延</p>
+                <div class="feature-grid reveal reveal-delay-3">
+                    <div class="feature-card">
+                        <h4>KAIROS</h4>
+                        <p>主动判断时机，15秒打断成本</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>YOLO Classifier</h4>
+                        <p>风险标签自动调节壳松紧</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Hooks</h4>
+                        <p>8个插槽开放平台</p>
+                    </div>
+                </div>
+                <div class="quote-block reveal reveal-delay-4">
+                    <p>"补偿面不只是在迁移，它在膨胀"</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 20: Summary -->
+        <section class="slide" id="slide-20">
+            <div class="slide-content">
+                <div class="number reveal">20</div>
+                <h2 class="reveal reveal-delay-1"><span class="accent-cyan">四个洞察</span></h2>
+                <p class="subtitle reveal reveal-delay-2">Harness是动态的，不是静态的</p>
+                <div class="timeline reveal reveal-delay-3">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>加是为了补偿，拆是因为模型进步</h4>
+                            <p>每个组件编码了一条关于模型做不到什么的假设</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+                        <div class="timeline-content">
+                            <h4>补偿面在迁移，也在膨胀</h4>
+                            <p>从执行任务 → 好用、可控、可商业化</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>真正的能力是追踪迁移的速度</h4>
+                            <p>护城河不在厚度，在迁移速度</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background: var(--magenta); box-shadow: var(--glow-magenta);"></div>
+                        <div class="timeline-content">
+                            <h4>通往简单的路，必须经过复杂</h4>
+                            <p>每一层被拆掉的补偿，都曾经被认真搭过</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 21: End -->
+        <section class="slide end" id="slide-21">
+            <div class="slide-content">
+                <div class="end-message reveal">Thank You</div>
+                <p class="subtitle reveal reveal-delay-1" style="text-align: center;">Harness Engineering: AI Agent的约束工程</p>
+                <div class="data-card reveal reveal-delay-2" style="text-align: center;">
+                    <div class="stat-row" style="justify-content: center;">
+                        <span class="stat-label">参考资料：</span>
+                        <span class="stat-value" style="font-size: var(--body-size);">Anthropic/OpenAI/Cursor/LangChain 工程博客</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="keyboard-hint">← → 空格 或滚轮导航</div>
+
+    <script>
+        // ===========================================
+        // PRESENTATION CONTROLLER
+        // ===========================================
+        class PresentationController {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.totalSlides = this.slides.length;
+                this.progressEl = document.getElementById('progress');
+                this.navDotsEl = document.getElementById('nav-dots');
+
+                this.init();
+            }
+
+            init() {
+                this.createNavDots();
+                this.setupKeyboard();
+                this.setupWheel();
+                this.setupTouch();
+                this.setupIntersectionObserver();
+                this.updateProgress();
+            }
+
+            createNavDots() {
+                for (let i = 0; i < this.totalSlides; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'nav-dot';
+                    dot.addEventListener('click', () => this.goToSlide(i));
+                    this.navDotsEl.appendChild(dot);
+                }
+                this.updateNavDots();
+            }
+
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+                        e.preventDefault();
+                        this.nextSlide();
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.prevSlide();
+                    } else if (e.key === 'Home') {
+                        e.preventDefault();
+                        this.goToSlide(0);
+                    } else if (e.key === 'End') {
+                        e.preventDefault();
+                        this.goToSlide(this.totalSlides - 1);
+                    }
+                });
+            }
+
+            setupWheel() {
+                let wheelTimeout;
+                document.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    clearTimeout(wheelTimeout);
+                    wheelTimeout = setTimeout(() => {
+                        if (e.deltaY > 0) {
+                            this.nextSlide();
+                        } else if (e.deltaY < 0) {
+                            this.prevSlide();
+                        }
+                    }, 50);
+                }, { passive: false });
+            }
+
+            setupTouch() {
+                let touchStartY = 0;
+                let touchEndY = 0;
+
+                document.addEventListener('touchstart', (e) => {
+                    touchStartY = e.touches[0].clientY;
+                });
+
+                document.addEventListener('touchend', (e) => {
+                    touchEndY = e.changedTouches[0].clientY;
+                    const diff = touchStartY - touchEndY;
+
+                    if (Math.abs(diff) > 50) {
+                        if (diff > 0) {
+                            this.nextSlide();
+                        } else {
+                            this.prevSlide();
+                        }
+                    }
+                });
+            }
+
+            setupIntersectionObserver() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const slideIndex = parseInt(entry.target.id.replace('slide-', '')) - 1;
+                            this.currentSlide = slideIndex;
+                            this.updateProgress();
+                            this.updateNavDots();
+                            this.revealElements(entry.target);
+                        }
+                    });
+                }, { threshold: 0.5 });
+
+                this.slides.forEach(slide => observer.observe(slide));
+            }
+
+            revealElements(slide) {
+                const reveals = slide.querySelectorAll('.reveal');
+                reveals.forEach(el => {
+                    el.classList.add('visible');
+                });
+            }
+
+            goToSlide(index) {
+                if (index >= 0 && index < this.totalSlides) {
+                    this.slides[index].scrollIntoView({ behavior: 'smooth' });
+                    this.currentSlide = index;
+                    this.updateProgress();
+                    this.updateNavDots();
+                }
+            }
+
+            nextSlide() {
+                this.goToSlide(this.currentSlide + 1);
+            }
+
+            prevSlide() {
+                this.goToSlide(this.currentSlide - 1);
+            }
+
+            updateProgress() {
+                const progress = ((this.currentSlide + 1) / this.totalSlides) * 100;
+                this.progressEl.style.width = `${progress}%`;
+            }
+
+            updateNavDots() {
+                const dots = this.navDotsEl.querySelectorAll('.nav-dot');
+                dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === this.currentSlide);
+                });
+            }
+        }
+
+        // Initialize
+        new PresentationController();
+    </script>
+</body>
+</html>
